@@ -35,7 +35,7 @@ Settings file: `extract-rules.local.md` (YAML frontmatter only, no markdown body
 | `exclude_dirs` | `[".git", ".claude"]` | Exclude directories (in addition to .gitignore) |
 | `exclude_patterns` | `[]` | Exclude file patterns (e.g., `*.generated.ts`, `*.d.ts`) |
 | `output_dir` | `.claude/rules` | Output directory |
-| `language` | `ja` | Report and generated label language (e.g., `ja`) |
+| `language` | `ja` | Report language (e.g., `ja`) |
 | `split_output` | `true` | Separate Principles (.md) and patterns (.local.md) |
 | `resolve_references` | `true` | Resolve file references during restructure |
 
@@ -281,7 +281,7 @@ For **Project-specific patterns** section:
 - Only include the minimal signature: type name, function signature with return type, or API combination
 - Example of minimal: `useAuth() → { user, login, logout }` (not full implementation)
 
-**For `.examples.md` files:** Read `references/examples-format.md` for file structure, Good/Bad contrast guidelines, and the reference section format. Each rule file with a corresponding `.examples.md` must end with a `## Examples` reference section (see the reference for language-aware label text).
+**For `.examples.md` files:** Read `references/examples-format.md` for file structure, Good/Bad contrast guidelines, and the reference section format. Each rule file with a corresponding `.examples.md` must end with a `## Examples` reference section (see the reference for format). `###` titles must match the corresponding rule name exactly — do not translate or rephrase.
 
 **paths patterns by category:**
 - TypeScript: `**/*.ts`, `**/*.tsx`

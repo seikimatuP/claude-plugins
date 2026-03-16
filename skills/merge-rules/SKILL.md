@@ -44,7 +44,7 @@ rules_dir: .claude/rules/
 # Examples: 3 projects → 2/3 needed, 4 projects → 3/4, 5 projects → 3/5
 promote_threshold: 0.5
 
-# Report and generated label language (default: ja)
+# Report language (default: ja)
 language: ja
 ---
 ```
@@ -116,7 +116,7 @@ For each normalized category (e.g., `languages/typescript`, `frameworks/rails-co
    - Use AI judgment to determine semantic equivalence (e.g., `useAuth()` and `useAuth() → { user, login, logout }` refer to the same pattern)
 3. Count occurrences per pattern across projects
 4. Calculate threshold: pattern must appear in more than `len(projects) * promote_threshold` projects (i.e., strict majority when threshold = 0.5)
-5. Patterns meeting threshold → append to the corresponding normalized `.md` output under `## Common patterns` section
+5. Patterns meeting threshold → append to the corresponding normalized `.md` output under `## Project-specific patterns` section
 6. Patterns below threshold → discard (listed in report for reference)
 
 ### Step 5.5: Merge Examples (.examples.md)
@@ -128,9 +128,9 @@ For each normalized `.examples.md` file group:
    - Same principle heading across projects → adopt the most detailed example, or merge Good/Bad from different projects
    - If Good/Bad contrast exists in one project but not another → adopt from the project that has it
    - Deduplicate identical examples
-3. **Project-specific Examples**: Only include examples for patterns that were promoted to `## Common patterns` in Step 5
+3. **Project-specific Examples**: Only include examples for patterns that were promoted in Step 5
    - Use the same semantic equivalence judgment as Step 5 (matching by inline code signature with AI judgment) to link `###` example headings to promoted patterns — do not rely solely on exact heading match
-   - If a pattern met the promotion threshold, include its example in the output `.examples.md` under `## Common patterns Examples`
+   - If a pattern met the promotion threshold, include its example in the output `.examples.md` under `## Project-specific Examples`
    - Discard examples for patterns below threshold (same as the pattern itself)
 4. Output `.examples.md` file structure:
 
@@ -149,7 +149,7 @@ For each normalized `.examples.md` file group:
 <example>
 ```
 
-## Common patterns Examples
+## Project-specific Examples
 
 ### <Pattern signature>
 ```<lang>
@@ -157,7 +157,8 @@ For each normalized `.examples.md` file group:
 ```
 ```
 
-- `## Common patterns Examples` section is only included when promoted patterns with examples exist
+- `## Project-specific Examples` section is only included when promoted patterns with examples exist
+- `###` titles must match the corresponding rule name in the merged output `.md` file. Do not rephrase
 - No `paths:` frontmatter (prevents auto-loading)
 - If no examples exist for any merged rule, skip generating the `.examples.md` file
 
@@ -190,23 +191,22 @@ paths:
 - Immutability (spread, map/filter/reduce, const)
 - Type safety (strict mode, explicit annotations, no any)
 
-## Common patterns
+## Project-specific patterns
 
 - `useAuth() → { user, login, logout }` - auth hook interface
 ```
 
-- `## Common patterns` section is only included when promoted patterns exist
+- `## Project-specific patterns` section is only included when promoted patterns exist
 - Omit `## Principles` section if no principles exist for this category
 - If a corresponding `.examples.md` was generated, append a reference section at the end:
   ```markdown
   ## Examples
-  <label>: ./<name>.examples.md
+  When in doubt: ./<name>.examples.md
   ```
-  Label text: `language: ja` → `判断に迷った場合`, otherwise → `When in doubt`
 
 ### Step 7: Report Summary
 
-Display report using the project's directory name (last path component) as label. When `language` is set (e.g., `ja`), use that language for report headers. When not set, default to English.
+Display report using the project's directory name (last path component) as label. Report headers are always in English.
 
 ```
 # Merge Rules Report
@@ -227,7 +227,7 @@ Display report using the project's directory name (last path component) as label
 | frameworks/react.md | 2/3 | 3 | 1 | 4 |
 | integrations/rails-inertia.md | 2/3 | 2 | 0 | 2 |
 
-**Examples** = total `###` entries in the output `.examples.md` (Principles Examples + Common patterns Examples).
+**Examples** = total `###` entries in the output `.examples.md` (Principles Examples + Project-specific Examples).
 
 ## Promoted Patterns
 - `useAuth()` (typescript) - 3/3 projects

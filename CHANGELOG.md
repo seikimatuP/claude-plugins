@@ -2,6 +2,18 @@
 
 ## 2026-03-16
 
+### extract-rules v1.9.1 / merge-rules v1.1.1
+
+- fix: Standardize all section headings (`#`, `##`, `###`) and reference labels to English regardless of `language` setting
+  - Remove i18n heading tables and language-aware label switching (`判断に迷った場合` / `When in doubt` → `When in doubt` fixed)
+  - `language` setting now only affects rule content (Good/Bad examples, descriptions) and reports
+- refactor: Unify `## Common patterns` into `## Project-specific patterns` in merge-rules output
+  - Eliminates separate section for promoted patterns — input/output section names now match
+  - Simplifies re-merging of merge-rules output
+- fix: Add explicit `###` title matching rule (must match rule file names exactly, no translation/rephrasing)
+  - extract-rules: Added to SKILL.md and examples-format.md with concrete examples
+  - merge-rules: Added to Step 5.5 output constraints
+
 ### ask-codex v1.1.3 / ask-gemini v1.1.2
 
 - fix: Update outdated model names in SKILL.md examples

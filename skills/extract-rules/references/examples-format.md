@@ -10,12 +10,23 @@ Reference guide for generating and updating `.examples.md` files.
 
 Always generate one `.examples.md` per rule category (regardless of `split_output` setting). When `split_output: true`, the `.examples.md` combines examples for both `.md` principles and `.local.md` patterns in one file.
 
+**Section headings (`#`, `##`) are always in English regardless of the `language` setting.** Only the rule content (Good/Bad examples, descriptions) follows the `language` setting.
+
+**Example title (`###`) must match the corresponding rule name in the rule file.** Do not translate or rephrase the extracted title. This ensures a clear 1:1 mapping between rules and their examples.
+
+- **Principles**: Use the principle name (text before parenthetical hints)
+  - Rule: `- FP only (no classes, pure functions, composition over inheritance)` → `### FP only`
+  - Rule: `- Concern分離 (共有ロジックは concerns/ に抽出)` → `### Concern分離`
+- **Project-specific patterns**: Use the signature portion (backtick content)
+  - Rule: `` - `useAuth() → { user, login, logout }` - auth hook interface `` → `` ### `useAuth() → { user, login, logout }` ``
+  - Rule: `` - `clean_bracket_params(:keyword)` - WAF付加のブラケット除去 `` → `` ### `clean_bracket_params(:keyword)` ``
+
 ```markdown
 # <Category> Rules - Examples
 
 ## Principles Examples
 
-### <Principle name>
+### <Principle name from rule file>
 **Good:**
 ```<lang>
 <actual code from codebase demonstrating correct usage>
@@ -27,7 +38,7 @@ Always generate one `.examples.md` per rule category (regardless of `split_outpu
 
 ## Project-specific Examples
 
-### <Pattern signature>
+### <Pattern signature from rule file>
 ```<lang>
 <usage example from codebase>
 ```
@@ -45,14 +56,11 @@ See `extraction-criteria.md` "Example Quality Criteria" section for detailed qua
 
 ## Reference Section in Rule Files
 
-Each rule file (`.md` and `.local.md`) that has a corresponding `.examples.md` must end with a reference section. The label text depends on the resolved `language` setting:
-
-- `ja` (default) → `判断に迷った場合: ./<name>.examples.md`
-- Other languages → `When in doubt: ./<name>.examples.md`
+Each rule file (`.md` and `.local.md`) that has a corresponding `.examples.md` must end with a reference section:
 
 ```markdown
 ## Examples
-<label>: ./<name>.examples.md
+When in doubt: ./<name>.examples.md
 ```
 
 ## Common Generation Procedure
