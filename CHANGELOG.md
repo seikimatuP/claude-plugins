@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-03-16
+
+### extract-rules v1.9.0
+
+- feat: Add `.examples.md` generation for Good/Bad code examples per rule category
+  - Separate from rule files (no `paths:` frontmatter) — not auto-loaded into context
+  - Good/Bad contrast for principles, usage examples for project-specific patterns
+  - All modes support `.examples.md` (Full Extraction, Update, Restructure, Conversation, PR Review)
+  - Format specification externalized to `references/examples-format.md`
+  - Quality criteria added to `references/extraction-criteria.md`
+- feat: Add `language` resolution chain: skill config → Claude Code settings → default `ja`
+  - **Note**: Default changed from `(none)` (English) to `ja`. To keep English output, set `language: en` in config
+- fix: `language` description updated to reflect usage in both reports and generated labels
+
+### merge-rules v1.1.0
+
+- feat: Add `.examples.md` merge support
+  - Merge Principles Examples by section heading (adopt most detailed or merge Good/Bad)
+  - Project-specific Examples linked to promoted patterns via semantic matching
+  - Output under `## Common patterns Examples` section
+- feat: Add hybrid format (`split_output: false`) input support
+  - Detect `## Project-specific patterns` in `.md` files and treat as promotion candidates
+- feat: Add `language` resolution chain: skill config → Claude Code settings → default `ja`
+- fix: `promote_threshold` example corrected (`4 projects → 3/4`, not `2/4`)
+- fix: Report template switched to English base with `language` setting support
+
 ## 2026-03-14
 
 ### extract-rules v1.8.0

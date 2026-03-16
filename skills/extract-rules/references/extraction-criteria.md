@@ -97,3 +97,30 @@ For patterns that are **not clearly general or project-specific**:
 - If the pattern is used project-wide or defines a convention → include
 - If the pattern is a local utility (1-2 usage sites) → skip
 - Rationale: Over-specifying with local utilities clutters rule files with implementation details rather than style guidance. Rules should answer "how to write new code" not "what utilities exist."
+
+---
+
+## Example Quality Criteria
+
+**Goal:** Ensure `.examples.md` files contain useful, accurate examples that help Claude apply rules correctly.
+
+### Good examples (what to include)
+
+- **Source from actual codebase**: Good examples must come from real code found in the project, not fabricated. If no relevant code can be found (e.g., the rule is about something not yet implemented), skip the example for now
+- **Minimal but complete**: Show enough context to understand usage, but not full implementation details
+- **Representative**: Choose examples that demonstrate the most common usage pattern
+
+### Bad examples (anti-patterns)
+
+- **From actual codebase**: Prefer real anti-patterns found in the project (e.g., older code, refactored patterns)
+- **From typical Claude output**: If no real anti-pattern exists, show what Claude would typically generate without the rule
+- **Optional**: If no meaningful Bad example exists (e.g., project-specific type usage), omit Bad and show only Good
+
+### When Good/Bad contrast is effective
+
+| Rule type | Good/Bad contrast? | Reason |
+| --------- | ------------------- | ------ |
+| Paradigm choices (FP only, no ORM) | Yes | Claude would default to the opposite |
+| Prohibited patterns (no default exports) | Yes | Shows what to avoid |
+| Project-defined types/hooks | Good only | No meaningful "bad" — Claude just doesn't know the type exists |
+| API combinations (pathFor + url) | Good only | Shows correct usage pattern |

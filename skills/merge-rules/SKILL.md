@@ -6,7 +6,7 @@ allowed-tools: Read, Glob, Grep, Write, Bash(ls *), Bash(mkdir *), Bash(wc *)
 
 # Merge Rules
 
-Merges `.claude/rules/` from multiple projects into a unified portable rule set (.md only). Promotes `.local.md` patterns that appear across a threshold of projects.
+Merges `.claude/rules/` from multiple projects into a unified portable rule set (.md + .examples.md). Promotes `.local.md` patterns that appear across a threshold of projects. Merges `.examples.md` files alongside rule files.
 
 ## Usage
 
@@ -41,10 +41,10 @@ output_dir: .claude/rules/
 rules_dir: .claude/rules/
 
 # Threshold for promoting .local.md patterns (default: 0.5 = majority)
-# Examples: 3 projects → 2/3 needed, 4 projects → 2/4, 5 projects → 3/5
+# Examples: 3 projects → 2/3 needed, 4 projects → 3/4, 5 projects → 3/5
 promote_threshold: 0.5
 
-# Output language for reports (default: ja)
+# Report and generated label language (default: ja)
 language: ja
 ---
 ```
@@ -56,6 +56,7 @@ language: ja
 1. Search for config file (see search order above)
    - If not found: Error "No config file found. Create `.claude/merge-rules.local.md` or specify with `--config`."
 2. Parse YAML frontmatter, apply defaults for omitted fields
+   - **`language` resolution order:** Skill config → Claude Code settings (`~/.claude/settings.json` → `language` field) → default `ja`
 3. Validate:
    - `projects` must have at least 2 entries
    - Each project path must exist and contain `rules_dir`
@@ -65,20 +66,24 @@ language: ja
 
 For each project:
 
-1. Find all `.md` and `.local.md` files under `{path}/{rules_dir}/` (recursive)
+1. Find all `.md`, `.local.md`, and `.examples.md` files under `{path}/{rules_dir}/` (recursive)
 2. Categorize:
-   - `languages/*.md` → portable principles (always merge)
-   - `frameworks/*.md` → portable principles (always merge)
-   - `integrations/*.md` → portable principles (always merge)
+   - `languages/*.md` → portable principles (always merge). **If the file also contains `## Project-specific patterns`** (hybrid format from `split_output: false`), treat patterns as promotion candidates (same as `.local.md`)
+   - `frameworks/*.md` → same as above
+   - `integrations/*.md` → same as above
    - `languages/*.local.md` → promotion candidate
    - `frameworks/*.local.md` → promotion candidate
    - `integrations/*.local.md` → promotion candidate
+   - `languages/*.examples.md` → example file (merge with rules)
+   - `frameworks/*.examples.md` → example file (merge with rules)
+   - `integrations/*.examples.md` → example file (merge with rules)
    - `project.md` → skip (inherently project-specific)
-3. Parse each file: extract YAML frontmatter (`paths:`) and body sections (`## Principles`, `## Project-specific patterns`)
+   - `project.examples.md` → skip (inherently project-specific)
+3. Parse each file: extract YAML frontmatter (`paths:`) and body sections (`## Principles`, `## Project-specific patterns`, `## Principles Examples`, `## Project-specific Examples`)
 
 ### Step 3: Normalize Similar File Names
 
-Before merging, group files that refer to the same concept but have different names. This applies to both `.md` and `.local.md` files — a `.md` and its corresponding `.local.md` share the same normalization (e.g., `rails-controller.md` and `rails-controller.local.md` are normalized together with `rails-controllers.md` and `rails-controllers.local.md`).
+Before merging, group files that refer to the same concept but have different names. This applies to `.md`, `.local.md`, and `.examples.md` files — a `.md` and its corresponding `.local.md` and `.examples.md` share the same normalization (e.g., `rails-controller.md`, `rails-controller.local.md`, and `rails-controller.examples.md` are normalized together with their `rails-controllers.*` variants).
 
 1. Detect similar file names within the same directory (e.g., `rails-controller.md` vs `rails-controllers.md`, `rails-model.md` vs `rails-models.md`)
    - Singular/plural variants (e.g., `controller` / `controllers`)
@@ -104,15 +109,57 @@ For each unique (normalized) file name across projects (e.g., `languages/typescr
 
 ### Step 5: Promote .local.md Patterns
 
-For each normalized `.local.md` file group (e.g., `languages/typescript.local.md`, `frameworks/rails-controllers.local.md`, or `integrations/rails-inertia.local.md`):
+For each normalized category (e.g., `languages/typescript`, `frameworks/rails-controllers`, `integrations/rails-inertia`):
 
-1. Collect `## Project-specific patterns` from all projects that have this file (including normalized name variants)
+1. Collect `## Project-specific patterns` from all projects — from `.local.md` files and from hybrid `.md` files that contain this section (see Step 2)
 2. Match patterns by inline code signature (backtick portion before ` - `)
    - Use AI judgment to determine semantic equivalence (e.g., `useAuth()` and `useAuth() → { user, login, logout }` refer to the same pattern)
 3. Count occurrences per pattern across projects
 4. Calculate threshold: pattern must appear in more than `len(projects) * promote_threshold` projects (i.e., strict majority when threshold = 0.5)
 5. Patterns meeting threshold → append to the corresponding normalized `.md` output under `## Common patterns` section
 6. Patterns below threshold → discard (listed in report for reference)
+
+### Step 5.5: Merge Examples (.examples.md)
+
+For each normalized `.examples.md` file group:
+
+1. Collect all versions from projects that have this file (including normalized variants)
+2. **Principles Examples**: Merge by section heading (e.g., `### FP only`)
+   - Same principle heading across projects → adopt the most detailed example, or merge Good/Bad from different projects
+   - If Good/Bad contrast exists in one project but not another → adopt from the project that has it
+   - Deduplicate identical examples
+3. **Project-specific Examples**: Only include examples for patterns that were promoted to `## Common patterns` in Step 5
+   - Use the same semantic equivalence judgment as Step 5 (matching by inline code signature with AI judgment) to link `###` example headings to promoted patterns — do not rely solely on exact heading match
+   - If a pattern met the promotion threshold, include its example in the output `.examples.md` under `## Common patterns Examples`
+   - Discard examples for patterns below threshold (same as the pattern itself)
+4. Output `.examples.md` file structure:
+
+```markdown
+# <Category> Rules - Examples
+
+## Principles Examples
+
+### <Principle name>
+**Good:**
+```<lang>
+<example>
+```
+**Bad:**
+```<lang>
+<example>
+```
+
+## Common patterns Examples
+
+### <Pattern signature>
+```<lang>
+<example>
+```
+```
+
+- `## Common patterns Examples` section is only included when promoted patterns with examples exist
+- No `paths:` frontmatter (prevents auto-loading)
+- If no examples exist for any merged rule, skip generating the `.examples.md` file
 
 ### Step 6: Write Output
 
@@ -122,9 +169,12 @@ For each normalized `.local.md` file group (e.g., `languages/typescript.local.md
    - If not exists: create with `mkdir -p`
 2. Write merged files preserving directory structure:
    - `languages/<lang>.md`
+   - `languages/<lang>.examples.md` (if examples exist)
    - `frameworks/<framework>.md`
+   - `frameworks/<framework>.examples.md` (if examples exist)
    - `integrations/<framework>-<integration>.md`
-   - Only `.md` files (no `.local.md` in output)
+   - `integrations/<framework>-<integration>.examples.md` (if examples exist)
+   - Only `.md` and `.examples.md` files (no `.local.md` in output)
 3. Output file format:
 
 ```markdown
@@ -147,40 +197,48 @@ paths:
 
 - `## Common patterns` section is only included when promoted patterns exist
 - Omit `## Principles` section if no principles exist for this category
+- If a corresponding `.examples.md` was generated, append a reference section at the end:
+  ```markdown
+  ## Examples
+  <label>: ./<name>.examples.md
+  ```
+  Label text: `language: ja` → `判断に迷った場合`, otherwise → `When in doubt`
 
 ### Step 7: Report Summary
 
-Display report using the project's directory name (last path component) as label.
+Display report using the project's directory name (last path component) as label. When `language` is set (e.g., `ja`), use that language for report headers. When not set, default to English.
 
 ```
-# Merge Rules レポート
+# Merge Rules Report
 
-## ソース
+## Sources
 - frontend-app (3 files)
 - backend-api (2 files)
 - shared-lib (4 files)
 
-## ファイル名の正規化
+## File Name Normalization
 - `rails-controller.md` + `rails-controllers.md` → `rails-controllers.md`
 - `rails-model.md` + `rails-models.md` → `rails-models.md`
 
-## マージ結果
-| ファイル | ソース数 | Principles | 昇格パターン |
-|----------|----------|------------|-------------|
-| languages/typescript.md | 3/3 | 5 | 2 |
-| frameworks/react.md | 2/3 | 3 | 1 |
-| integrations/rails-inertia.md | 2/3 | 2 | 0 |
+## Merge Results
+| File | Sources | Principles | Promoted patterns | Examples |
+|------|---------|------------|-------------------|----------|
+| languages/typescript.md | 3/3 | 5 | 2 | 7 |
+| frameworks/react.md | 2/3 | 3 | 1 | 4 |
+| integrations/rails-inertia.md | 2/3 | 2 | 0 | 2 |
 
-## 昇格されたパターン
-- `useAuth()` (typescript) - 3/3 プロジェクトで共通
-- `pathFor() + url()` (react) - 2/3 プロジェクトで共通
+**Examples** = total `###` entries in the output `.examples.md` (Principles Examples + Common patterns Examples).
 
-## 閾値未満のパターン（参考）
-- `useCustomHook()` (typescript) - 1/3 (frontend-app のみ)
-- `ApiClient.create()` (typescript) - 1/3 (backend-api のみ)
+## Promoted Patterns
+- `useAuth()` (typescript) - 3/3 projects
+- `pathFor() + url()` (react) - 2/3 projects
 
-## スキップ
-- project.md x3 (プロジェクト固有のためスキップ)
+## Below Threshold (reference)
+- `useCustomHook()` (typescript) - 1/3 (frontend-app only)
+- `ApiClient.create()` (typescript) - 1/3 (backend-api only)
+
+## Skipped
+- project.md x3 (project-specific, skipped)
 ```
 
 ## Conflict Handling

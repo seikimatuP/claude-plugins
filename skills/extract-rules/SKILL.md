@@ -35,7 +35,7 @@ Settings file: `extract-rules.local.md` (YAML frontmatter only, no markdown body
 | `exclude_dirs` | `[".git", ".claude"]` | Exclude directories (in addition to .gitignore) |
 | `exclude_patterns` | `[]` | Exclude file patterns (e.g., `*.generated.ts`, `*.d.ts`) |
 | `output_dir` | `.claude/rules` | Output directory |
-| `language` | (none) | Report output language (e.g., `ja`) |
+| `language` | `ja` | Report and generated label language (e.g., `ja`) |
 | `split_output` | `true` | Separate Principles (.md) and patterns (.local.md) |
 | `resolve_references` | `true` | Resolve file references during restructure |
 
@@ -61,14 +61,17 @@ resolve_references: true
 ```text
 .claude/rules/
 ├── languages/
-│   ├── typescript.md          # Principles only (portable)
-│   ├── typescript.local.md    # Project-specific patterns only
+│   ├── typescript.md              # Principles only (portable)
+│   ├── typescript.local.md        # Project-specific patterns only
+│   ├── typescript.examples.md     # Examples for both (no auto-load)
 │   └── ...
 ├── frameworks/
-│   ├── react.md               # Principles only (portable)
-│   ├── react.local.md         # Project-specific patterns only
+│   ├── react.md                   # Principles only (portable)
+│   ├── react.local.md             # Project-specific patterns only
+│   ├── react.examples.md          # Examples for both (no auto-load)
 │   └── ...
-└── project.md                 # Always single file (no split)
+├── project.md                     # Always single file (no split)
+└── project.examples.md            # Examples (no auto-load)
 ```
 
 Principles (portable across projects) and Project-specific patterns (local) are separated by default. This enables organizational rule sharing and AI-driven merge across projects.
@@ -77,10 +80,13 @@ Principles (portable across projects) and Project-specific patterns (local) are 
 ```text
 .claude/rules/
 ├── languages/
-│   └── typescript.md    # Principles + Project-specific patterns
+│   ├── typescript.md              # Principles + Project-specific patterns
+│   └── typescript.examples.md     # Examples (no auto-load)
 ├── frameworks/
-│   └── react.md         # Principles + Project-specific patterns
-└── project.md           # Domain, architecture, conventions
+│   ├── react.md                   # Principles + Project-specific patterns
+│   └── react.examples.md          # Examples (no auto-load)
+├── project.md                     # Domain, architecture, conventions
+└── project.examples.md            # Examples (no auto-load)
 ```
 
 **Layered frameworks** (Rails, Django, Spring, etc.):
@@ -97,19 +103,20 @@ When integration libraries are detected alongside a layered framework:
   (e.g., Rails: `render inertia:` vs Laravel: `Inertia::render()`)
 - In split mode, integration files also get `.local.md` counterparts
 
-Example output with integrations:
+Example output with integrations (split mode — each category also gets `.examples.md`):
 ```text
 .claude/rules/
 ├── languages/
-│   └── ruby.md
+│   ├── ruby.md / ruby.local.md / ruby.examples.md
 ├── frameworks/
-│   ├── rails.md
-│   ├── rails-controllers.md
-│   └── rails-models.md
+│   ├── rails.md / rails.local.md / rails.examples.md
+│   ├── rails-controllers.md / .local.md / .examples.md
+│   └── rails-models.md / .local.md / .examples.md
 ├── integrations/
-│   ├── rails-inertia.md
-│   └── rails-pundit.md
-└── project.md
+│   ├── rails-inertia.md / .local.md / .examples.md
+│   └── rails-pundit.md / .local.md / .examples.md
+├── project.md
+└── project.examples.md
 ```
 
 **Format switching:** Run `--restructure` after changing `split_output` setting to switch between split and hybrid formats.
@@ -144,36 +151,20 @@ Search for `extract-rules.local.md`:
 
 **Extract settings** (`target_dirs`, `exclude_dirs`, `exclude_patterns`, `output_dir`, `language`, `split_output`, `resolve_references`) from the config file. See Configuration section above for defaults.
 
+**`language` resolution:** skill config → Claude Code settings (`~/.claude/settings.json` `language` field) → default `ja`
+
 ### Step 2: Detect Project Type
 
 Detect project language and framework:
 
-**1. Check configuration files:**
-- `package.json` → Node.js/TypeScript/JavaScript
-- `tsconfig.json` → TypeScript
-- `pyproject.toml`, `requirements.txt` → Python
-- `go.mod` → Go
-- `Cargo.toml` → Rust
-- `Gemfile` → Ruby/Rails
-- `pom.xml`, `build.gradle` → Java
+**1. Detect languages** by config files (`package.json`, `tsconfig.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`, `pom.xml`, etc.) and file extensions (`.ts`/`.tsx`, `.py`, `.go`, `.rb`, etc.)
 
-**2. Count file extensions:**
-- `.ts`, `.tsx` → TypeScript
-- `.js`, `.jsx` → JavaScript
-- `.py` → Python
-- `.go` → Go
-- `.rb` → Ruby
+**2. Detect frameworks** by their config files (e.g., `next.config.*`, `playwright.config.*`) and dependencies in package manifests.
 
-**3. Detect framework-specific files:**
+**3. Detect architectural layers** (for layered frameworks):
+If a framework has distinct layers with separate directories (e.g., Rails: `app/models/`, `app/controllers/`; Django: `models.py`, `views.py`), detect them for layer-specific rule files. Only split when corresponding directories actually exist.
 
-Identify frameworks by their config files (e.g., `next.config.*`, `playwright.config.*`, `jest.config.*`) and dependencies in package.json, requirements.txt, Gemfile, etc.
-
-**4. Detect architectural layers** (for layered frameworks):
-
-If a framework has distinct layers with separate directories (e.g., Rails: `app/models/`, `app/controllers/`, `app/views/`; Django: `models.py`, `views.py`; Spring: `controller/`, `service/`, `repository/`), detect them for layer-specific rule files. Only split when corresponding directories actually exist.
-
-**5. Detect integration libraries** (for layered frameworks):
-
+**4. Detect integration libraries** (for layered frameworks):
 Read `references/integration-criteria.md` for detection rules and classification criteria.
 
 **Output:** List of detected languages, frameworks, architectural layers, and integration libraries
@@ -182,26 +173,9 @@ Read `references/integration-criteria.md` for detection rules and classification
 
 Collect target files for analysis:
 
-1. **Get git-tracked files** (if in a git repository)
-   - Use `git ls-files` to get list of tracked files
-   - This automatically respects ALL `.gitignore` files (root and subdirectories)
-   - If not a git repo, fall back to Glob with manual exclusions:
-     - Read `.gitignore` if present and apply patterns
-     - Apply `exclude_dirs` and `exclude_patterns` from settings
-     - Note: Nested `.gitignore` files may not be fully respected in non-git mode
-
-2. Filter files by `target_dirs` setting
-
-3. Exclude files matching:
-   - `exclude_dirs` from settings
-   - `exclude_patterns` from settings
-
-4. Filter by detected language extensions
-
-5. Sample files per category, distributed across directories for representative coverage
-   - Target: 10-15 files per category (language/framework)
-   - For large projects (100+ files per category): prioritize diversity across directories over quantity
-   - For small projects (<10 files per category): analyze all files
+1. **Get git-tracked files** using `git ls-files` (respects `.gitignore`). If not a git repo, fall back to Glob with manual exclusions from settings.
+2. Filter by `target_dirs`, `exclude_dirs`, `exclude_patterns`, and detected language extensions
+3. Sample 10-15 files per category, distributed across directories for representative coverage. Large projects (100+): prioritize directory diversity. Small projects (<10): analyze all files.
 
 ### Step 4: Analyze by Category
 
@@ -260,9 +234,10 @@ Read `references/security.md` before generating output to ensure sensitive infor
    - **Layered frameworks**: `<framework>.md` (cross-layer) + `<framework>-<layer>.md` per detected layer with scoped `paths:`
    - **Integration libraries**: See `references/integration-criteria.md` "Output structure" section.
 
-   **By default** (`split_output: true`): Generate 2 files per category (except project.md):
+   **By default** (`split_output: true`): Generate 3 files per category (except project.md which gets 2):
    - `<name>.md` — `## Principles` only (portable)
    - `<name>.local.md` — `## Project-specific patterns` only (local)
+   - `<name>.examples.md` — Examples for both (no `paths:` frontmatter, no auto-load)
    - Layer-specific and regular files require `paths:` frontmatter independently. Cross-layer files (`<framework>.md`) use no `paths:` or broad scope as they apply across all layers.
    - Skip generating a file if it would be empty. Skipped files are omitted from the Step 7 report.
 
@@ -306,6 +281,8 @@ For **Project-specific patterns** section:
 - Only include the minimal signature: type name, function signature with return type, or API combination
 - Example of minimal: `useAuth() → { user, login, logout }` (not full implementation)
 
+**For `.examples.md` files:** Read `references/examples-format.md` for file structure, Good/Bad contrast guidelines, and the reference section format. Each rule file with a corresponding `.examples.md` must end with a `## Examples` reference section (see the reference for language-aware label text).
+
 **paths patterns by category:**
 - TypeScript: `**/*.ts`, `**/*.tsx`
 - Python: `**/*.py`
@@ -325,7 +302,7 @@ After generating all rule files, verify no sensitive information was included:
    - Internal URLs: `(internal|staging|localhost:[0-9]+)`
 2. If found, redact with placeholders (e.g., `API_KEY_REDACTED`) and warn the user
 
-**Note:** This check applies to all modes that generate or update rule files (Full Extraction, Update, Restructure, Conversation Extraction).
+**Note:** This check applies to all modes that generate or update rule files (Full Extraction, Update, Restructure, Conversation Extraction). Also check `.examples.md` files — they contain actual code from the codebase and may include sensitive information.
 
 ### Step 7: Report Summary
 
@@ -346,7 +323,7 @@ When `--update` is specified, re-scan the codebase and add new patterns while pr
    - If `split_output: true` and hybrid files exist (`.md` files containing both `## Principles` and `## Project-specific patterns`): warn that hybrid files were found — recommend running `--restructure` to migrate to split format
    - If `split_output: false` and `.local.md` files exist: warn that orphaned `.local.md` files were found — recommend deleting orphaned files manually or running `--restructure`
 
-3. Load existing rule files to understand current rules (load both `<name>.md` and `<name>.local.md` when split)
+3. Load existing rule files to understand current rules (load `<name>.md`, `<name>.local.md`, and `<name>.examples.md` when split)
 
 ### Step U2: Re-scan Codebase
 
@@ -390,6 +367,7 @@ For each extracted principle/pattern:
 4. **When `split_output: true`**: Principles go to `<name>.md`, patterns go to `<name>.local.md`. Create missing files with proper frontmatter.
 5. For `project.md`: always append to the single file
 6. Maintain file structure and formatting
+7. **Update `.examples.md`**: Follow the common generation procedure in `references/examples-format.md` to add examples for each new rule.
 
 ### Step U5.5: Security Self-Check
 
@@ -409,7 +387,7 @@ When `--restructure` is specified, re-analyze the codebase to determine the opti
 
 1. Load settings (same as Step 1 in Full Extraction Mode)
 2. Check output directory exists → Error if not: "Run /extract-rules first to initialize rule files."
-3. Read and parse all existing rule files under output directory (`.md` and `.local.md`)
+3. Read and parse all existing rule files under output directory (`.md`, `.local.md`, and `.examples.md`)
 
 ### Step R2: Re-analyze Codebase
 
@@ -432,6 +410,7 @@ Compare old and new file structures, display planned changes (Keep/New/Remove pe
 3. Unmatched rules → `project.md` as fallback; preserve custom sections in the most relevant file
 4. Apply `split_output` setting (handle hybrid ↔ split transitions), deduplicate
 5. **Write new files first**, then remove old files no longer in the new structure
+6. **Handle `.examples.md`**: Rename/merge `.examples.md` files following the same structure changes as rule files. Generate new `.examples.md` for categories that didn't have one (see `references/examples-format.md`).
 
 ### Step R4.5: Security Self-Check
 
@@ -454,7 +433,7 @@ When `--from-conversation` is specified, extract rules from the conversation his
 2. Check if output directory exists (default: `.claude/rules/`)
    - If not exists: Error "Run /extract-rules first to initialize rule files."
 
-3. Load existing rule files to understand current rules (if `split_output: true`, load both `<name>.md` and `<name>.local.md`)
+3. Load existing rule files to understand current rules (if `split_output: true`, load `<name>.md`, `<name>.local.md`, and `<name>.examples.md`)
 
 ### Step C2: Analyze Conversation Context
 
@@ -498,9 +477,11 @@ Apply the same criteria as Full Extraction Mode (see `references/extraction-crit
 
 3. Append using the same format as Step 6 (see Format guidelines)
 
-4. Run Security Self-Check (same as Step 6.5) on updated files.
+4. **Update `.examples.md`**: Follow the common generation procedure in `references/examples-format.md` to add examples for each new rule.
 
-5. Report what was added. See `references/report-templates.md` for format.
+5. Run Security Self-Check (same as Step 6.5) on updated files.
+
+6. Report what was added. See `references/report-templates.md` for format.
 
 ---
 
@@ -515,7 +496,4 @@ Read `references/pr-review-mode.md` for the full processing steps (P1-P5). Key f
 3. Fetch review comments from GitHub API (3 endpoints per PR), filter bot comments
 4. Extract principles and patterns (same criteria as `references/extraction-criteria.md`)
 5. **Multiple PRs**: Cross-PR frequency analysis — general best practices that are repeatedly pointed out across different PRs are promoted as organizational emphasis (reframed with specific application context, not just restated)
-6. Append to existing rule files (same as Step C4)
-
----
-
+6. Append to existing rule files and update `.examples.md` (same as Step C4)

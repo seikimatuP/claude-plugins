@@ -15,12 +15,14 @@ Reference templates for each mode's output report.
 
 ### Generated Files
 
-| File | Principles | Patterns |
-|------|------------|----------|
-| languages/typescript.md | 3 | 5 |
-| frameworks/react.md | 2 | 8 |
-| integrations/rails-inertia.md | 1 | 4 |
-| project.md | - | architecture, conventions |
+| File | Principles | Patterns | Examples |
+|------|------------|----------|----------|
+| languages/typescript.md | 3 | 5 | 8 |
+| frameworks/react.md | 2 | 8 | 10 |
+| integrations/rails-inertia.md | 1 | 4 | 5 |
+| project.md | - | architecture, conventions | 3 |
+
+**Examples** = total number of `###` example entries in the corresponding `.examples.md` file (Principles Examples + Project-specific Examples combined).
 
 **Output**: `<output_dir>` (default: .claude/rules/)
 
@@ -51,6 +53,9 @@ Reference templates for each mode's output report.
 
 #### Project-specific patterns
 - `useNewFeature()` returns `{ data, refresh }` - new feature hook
+
+#### Examples (typescript.examples.md)
+- Added example for `useNewFeature()`
 
 ### Added to frameworks/react.md:
 - (none)
@@ -89,6 +94,7 @@ Reference templates for each mode's output report.
 | File | Fresh | Merged from existing | Total |
 |------|-------|---------------------|-------|
 | languages/typescript.md | 3 principles, 5 patterns | 0 principles, 2 patterns | 3 principles, 7 patterns |
+| languages/typescript.examples.md | 8 examples | 2 examples | 10 examples |
 
 ### Unmatched Rules (→ project.md)
 - (none)
@@ -122,6 +128,10 @@ Reference templates for each mode's output report.
 #### Project-specific patterns
 - `RefOrNull<T extends { id: string }> = T | { id: null }` - nullable refs
 
+#### Examples (typescript.examples.md)
+- Added Good/Bad for Immutability
+- Added usage example for `RefOrNull<T>`
+
 ### No changes:
 - Functional style - Already documented
 ```
@@ -139,6 +149,9 @@ Reference templates for each mode's output report.
 ### Added to frameworks/rails.local.md:
 #### Project-specific patterns
 - `fetchWithRetry(url, options)` - API call wrapper with retry
+
+#### Examples (rails.examples.md)
+- Added usage example for `fetchWithRetry()`
 
 ### No changes:
 - No project-specific rules found in general feedback
@@ -167,6 +180,10 @@ Reference templates for each mode's output report.
 ### Added to frameworks/rails.local.md:
 #### Project-specific patterns
 - `fetchWithRetry(url, options)` - API call wrapper with retry
+
+#### Examples (rails.examples.md)
+- Added Good/Bad for DRY厳格
+- Added usage example for `fetchWithRetry()`
 
 ### Skipped (general knowledge, single PR only):
 - const over let (PR #123 only)
