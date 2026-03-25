@@ -52,7 +52,7 @@ copilot -p "Refactor this function to use async/await" --allow-all-tools
 **Continue a previous session:**
 
 ```bash
-copilot --continue --allow-all-tools
+copilot -p "Now add error handling to that function" --continue --allow-all-tools
 ```
 
 ## Notes

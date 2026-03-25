@@ -28,6 +28,14 @@ codex exec "Your question or task here"
 
 > For all available options, run `codex exec --help`
 
+## Resume a session
+
+Use `exec resume --last` to continue the most recent session with a follow-up prompt:
+
+```bash
+codex exec resume --last "Your follow-up prompt"
+```
+
 ## Examples
 
 **Ask a coding question:**

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-03-25
+
+### ask-codex v1.2.0 / ask-gemini v1.2.0 / ask-copilot v1.0.2
+
+- feat: Add conversation continuation support
+  - ask-codex: `codex exec resume --last "prompt"` to resume the most recent session (dedicated section)
+  - ask-gemini: `gemini --resume latest -p "prompt"` to resume the most recent session
+- fix(ask-gemini): Use `-p` flag consistently for non-interactive mode
+  - Quick start, all examples, and notes updated to use `-p` instead of positional args
+  - Added `-p` to common options table
+- fix(ask-copilot): Add follow-up prompt to continuation example (consistent with other ask-* skills)
+
 ## 2026-03-16
 
 ### extract-rules v1.9.1 / merge-rules v1.1.1
