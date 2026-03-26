@@ -2,6 +2,14 @@
 
 ## 2026-03-26
 
+### dev-workflow v1.2.0 / dev-workflow-bundle v1.2.0
+
+- fix: Make peer re-review loop explicit (Step 3, Step 8)
+  - Explicitly specify `Skill(ask-peer)` re-invocation after modifications
+  - Require both updated artifact (plan/git diff) and change summary on re-review
+  - Clarify iteration counting (max 3 including initial review)
+  - Separate success exit (no feedback → next step) from max iterations reached (user decision)
+
 ### dev-workflow v1.1.0 / dev-workflow-bundle v1.1.0 (BREAKING)
 
 - **BREAKING**: Remove `lint_command`/`format_command`/`test_command`. Re-run `/dev-workflow --init` required

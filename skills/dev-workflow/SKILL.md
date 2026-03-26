@@ -79,8 +79,11 @@ test_commands:
 
 1. `Skill(ask-peer)`: Review the plan. Instruct peer to also read `.claude/rules/` for project conventions.
 2. Evaluate feedback, apply improvements, reject inapplicable points
-3. Re-review if modified, repeat until no actionable feedback remains
-4. If max iterations reached, present to user for decision
+3. If plan was modified, call `Skill(ask-peer)` again with:
+   - the updated plan
+   - a summary of changes made in response to the previous feedback
+   Count each `Skill(ask-peer)` call as one iteration, including the initial review. Repeat steps 2-3 until no actionable feedback remains.
+4. If no actionable feedback remains, proceed to Step 4. If 3 iterations reached and actionable feedback still remains, present the unresolved points to user for decision.
 
 ### Step 4: Finalize Plan
 
@@ -108,8 +111,11 @@ test_commands:
 
 1. `Skill(ask-peer)`: Review code changes (include `git diff HEAD` to capture all changes since workflow start). Instruct peer to also read `.claude/rules/`.
 2. Evaluate feedback, fix genuine issues, reject inapplicable points
-3. If code modified, re-run Step 7, then re-review
-4. If max iterations reached, present to user for decision
+3. If code was modified, re-run Step 7, then call `Skill(ask-peer)` again with:
+   - the latest `git diff HEAD`
+   - a summary of fixes made in response to the previous feedback
+   Count each `Skill(ask-peer)` call as one iteration, including the initial review. Repeat steps 2-3 until no actionable feedback remains.
+4. If no actionable feedback remains, proceed to Step 9. If 3 iterations reached and actionable feedback still remains, present the unresolved points to user for decision.
 
 ### Step 9: Update Rules
 
