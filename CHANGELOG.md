@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-03-26
+
+### dev-workflow v1.0.0 / dev-workflow-bundle v1.0.0
+
+- feat: Add guided development workflow skill
+  - Orchestrates: plan → peer review → implement → lint/format/test → code review → rules update
+  - `--init` mode for project setup (auto-detect lint/format/test commands)
+  - Peer plan review and code review with `.claude/rules/` reference
+  - Review loops with max 3 iterations
+  - Automatic rule extraction via extract-rules `--from-conversation`
+- feat: Add dev-workflow-bundle plugin
+  - All-in-one install: includes peer + extract-rules + dev-workflow
+  - Bundle uses symlinks to avoid duplicate maintenance
+
 ## 2026-03-25
 
 ### ask-codex v1.2.0 / ask-gemini v1.2.0 / ask-copilot v1.0.2
