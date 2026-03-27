@@ -2,6 +2,12 @@
 
 ## 2026-03-27
 
+### dev-workflow v1.5.0 / dev-workflow-bundle v1.5.0
+
+- feat: Pre-register 3 review iterations as TodoWrite items in Step 3/8
+  - Default is "run 3 times"; skip remaining only when reviewer returns "No actionable findings"
+  - Prevents short-circuiting reviews after a single iteration
+
 ### dev-workflow v1.4.0 / dev-workflow-bundle v1.4.0
 
 - feat: Strengthen code review (Step 8) enforcement to prevent skipping

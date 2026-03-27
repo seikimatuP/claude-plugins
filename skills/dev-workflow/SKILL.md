@@ -91,22 +91,22 @@ test_commands:
 3. Analyze the task and codebase, create implementation plan
 4. **No code changes in this phase**
 
-### Step 3: Plan Review (max 3 iterations)
+### Step 3: Plan Review (3 iterations)
 
-1. Call the reviewer skill resolved in Step 1 (e.g. `Skill(ask-peer)`): Review the plan.
+1. Register 3 review iterations in TodoWrite: `Plan Review: iteration 1`, `iteration 2`, `iteration 3` (all pending)
+2. For each iteration, mark it `in_progress`, then call the reviewer skill resolved in Step 1 (e.g. `Skill(ask-peer)`): Review the plan.
    - Instruct reviewer to read `.claude/rules/` for project conventions
    - Request feedback organized into three categories:
      a. **Scope & feasibility**: scope appropriateness, dependencies, risks, `.claude/rules/` compliance
      b. **Approach & alternatives**: simpler methods, architectural fit with existing code
      c. **Completeness**: edge cases, error handling, test strategy
    - Reviewer should only report actionable findings. If none, explicitly state "No actionable findings"
-2. Evaluate feedback, apply improvements, reject inapplicable points with reason
-3. If actionable feedback was found: apply improvements, then call the reviewer skill again with:
+3. If reviewer returned "No actionable findings": mark current and remaining iterations as `completed` (skip) and proceed to Step 4.
+4. Otherwise: apply improvements, reject inapplicable points with reason. Mark current iteration as `completed`. Proceed to the next iteration with:
    - the updated plan
    - a summary of changes made and rejections with reasons
    - the same three-category structure, `.claude/rules/` reference, and "No actionable findings" requirement
-   Count each reviewer call as one iteration, including the initial review. Repeat steps 2-3 until no actionable feedback remains.
-4. If no actionable feedback remains, proceed to Step 4. If 3 iterations reached and actionable feedback still remains, present the unresolved points to user for decision.
+5. If all 3 iterations completed and actionable feedback still remains, present the unresolved points to user for decision.
 
 ### Step 4: Finalize Plan
 
@@ -132,9 +132,10 @@ test_commands:
 
 > **GATE**: Verify TodoWrite shows Steps 2-7 as completed. Mark Step 8 as `in_progress`.
 
-### Step 8: Code Review (max 3 iterations) -- MANDATORY, DO NOT SKIP
+### Step 8: Code Review (3 iterations) -- MANDATORY, DO NOT SKIP
 
-1. Call the reviewer skill resolved in Step 1 (e.g. `Skill(ask-peer)`): Review code changes.
+1. Register 3 review iterations in TodoWrite: `Code Review: iteration 1`, `iteration 2`, `iteration 3` (all pending)
+2. For each iteration, mark it `in_progress`, then call the reviewer skill resolved in Step 1 (e.g. `Skill(ask-peer)`): Review code changes.
    - Include `git diff <base-commit>` (base-commit recorded in Step 2) to capture all changes since workflow start
    - Instruct reviewer to also read `.claude/rules/`
    - Request feedback organized into three categories:
@@ -142,14 +143,12 @@ test_commands:
      b. **Conventions & consistency**: adherence to `.claude/rules/`, naming, file structure, patterns
      c. **Simplicity & maintainability**: unnecessary complexity, duplication, unclear abstractions
    - Reviewer should only report actionable findings. If none, explicitly state "No actionable findings"
-2. Update TodoWrite with iteration status (e.g. `Code Review: iteration 1 - fixing N issues`)
-3. Evaluate feedback, fix genuine issues, reject inapplicable points with reason
-4. If actionable feedback was found: fix issues, re-run Step 7 if code was modified, then call the reviewer skill again with:
+3. If reviewer returned "No actionable findings": mark current and remaining iterations as `completed` (skip) and proceed to Step 9.
+4. Otherwise: fix genuine issues, reject inapplicable points with reason. Re-run Step 7 if code was modified. Mark current iteration as `completed`. Proceed to the next iteration with:
    - the latest `git diff <base-commit>`
    - a summary of fixes made and rejections with reasons
    - the same three-category structure, `.claude/rules/` reference, and "No actionable findings" requirement
-   Count each reviewer call as one iteration, including the initial review. Repeat steps 2-4 until no actionable feedback remains.
-5. If reviewer returns no actionable findings, proceed to Step 9. If 3 iterations reached and actionable feedback still remains, present the unresolved points to user for decision.
+5. If all 3 iterations completed and actionable feedback still remains, present the unresolved points to user for decision.
 
 ### Step 9: Update Rules
 
