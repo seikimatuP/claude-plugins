@@ -2,6 +2,15 @@
 
 ## 2026-03-28
 
+### dev-workflow v1.9.0 / dev-workflow-bundle v1.9.0
+
+- feat: Make review iteration count configurable (default: 3, positive integer)
+  - Add `review_iterations` setting to `dev-workflow.local.md` configuration
+  - Add `-i N` / `--iterations N` command option for per-invocation override
+  - Priority: `-i` / `--iterations` option > config `review_iterations` > default `3`
+  - Step 1: Dynamically generate N iteration sub-items for TodoWrite registration
+  - Steps 3/8: Process N pending iteration items instead of hardcoded 3
+
 ### dev-workflow v1.8.0 / dev-workflow-bundle v1.8.0
 
 - feat: Improve plan approval flow — reviewer reviews the plan before user approval

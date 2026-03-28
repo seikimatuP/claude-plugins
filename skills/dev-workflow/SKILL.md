@@ -9,8 +9,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, TodoWrite, EnterPlanMode, ExitPlan
 ## Usage
 
 ```text
-/dev-workflow --init         # Project setup (detect check/test commands)
-/dev-workflow <task>         # Execute workflow (default)
+/dev-workflow --init                    # Project setup (detect check/test commands)
+/dev-workflow [-i N | --iterations N] <task>   # Execute workflow (default)
 ```
 
 ## Prerequisites
@@ -27,6 +27,7 @@ Settings file: `dev-workflow.local.md` (YAML frontmatter only)
 ```yaml
 ---
 reviewer: "ask-peer"
+review_iterations: 3
 check_commands:
   - "pnpm run lint:fix"
   - "pnpm run format"
@@ -39,6 +40,7 @@ test_commands:
 ```
 
 - **reviewer**: Reviewer skill name (default: `ask-peer`). Choose from: ask-peer, ask-claude, ask-codex, ask-gemini, ask-copilot. Unsupported values fall back to `ask-peer`
+- **review_iterations**: Max iterations for Plan Review (Step 3) and Code Review (Step 8) (default: `3`, must be a positive integer). Can be overridden per invocation with `-i N` / `--iterations N`
 - **check_commands**: Static checks (lint, format, typecheck, etc.). Always run all in order
 - **test_commands**: Test execution. AI decides whether to run all tests or only related ones based on changes
 - Entries starting with `Skill(` are treated as skill invocations (commands and skills can be mixed)
@@ -47,7 +49,7 @@ test_commands:
 
 ## Mode Detection
 
-- `--init` → Init Mode
+- `--init` → Init Mode (`-i` / `--iterations` is ignored)
 - Otherwise → Execution Mode
 
 ---
@@ -73,20 +75,20 @@ test_commands:
 1. Read `.claude/dev-workflow.local.md` (project-level, priority) or `~/.claude/dev-workflow.local.md` (user-level)
 2. If neither exists, prompt user to run `/dev-workflow --init` and stop
 3. Resolve `reviewer` from config. If not specified or not in the supported list (ask-peer, ask-claude, ask-codex, ask-gemini, ask-copilot), use `ask-peer`
-4. Register all workflow phases with `TodoWrite`, including review iterations. Do NOT skip any phase:
+4. Resolve **N** (review iteration count):
+   1. If `-i` / `--iterations` option is present and is a positive integer, use it
+   2. Else if config `review_iterations` is present and is a positive integer, use it
+   3. Else use default `3`
+5. Register all workflow phases with `TodoWrite`, including review iterations. Do NOT skip any phase:
    - Step 2: Create Plan
    - Step 3: Plan Review
-   - Step 3-1: Plan Review - iteration 1
-   - Step 3-2: Plan Review - iteration 2
-   - Step 3-3: Plan Review - iteration 3
+   - Step 3-1 through Step 3-N: Plan Review - iteration 1 through N (generate N items based on resolved N)
    - Step 4: Finalize Plan
    - Step 5: Implement
    - Step 6: Simplify
    - Step 7: Check / Test
    - Step 8: Code Review (MANDATORY)
-   - Step 8-1: Code Review - iteration 1
-   - Step 8-2: Code Review - iteration 2
-   - Step 8-3: Code Review - iteration 3
+   - Step 8-1 through Step 8-N: Code Review - iteration 1 through N (generate N items based on resolved N)
    - Step 9: Update Rules
    Mark each item `in_progress` when starting and `completed` when done. These items must always remain in the list — implementation sub-tasks in Step 5 are additions, not replacements.
 
@@ -100,7 +102,7 @@ test_commands:
 
 ### Step 3: Plan Review
 
-Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item (Step 3-1, 3-2, 3-3) in order:
+Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item (Step 3-1 through 3-N) in order:
 
 1. Mark the iteration item as `in_progress`. Call the reviewer skill resolved in Step 1 (e.g. `Skill(ask-peer)`): Review the plan.
    - Instruct reviewer to read `.claude/rules/` for project conventions
@@ -114,7 +116,7 @@ Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item
    - the updated plan
    - a summary of changes made and rejections with reasons
    - the same three-category structure, `.claude/rules/` reference, and "No actionable findings" requirement
-4. If all 3 iteration items are completed and actionable feedback still remains, carry the unresolved points forward to Step 4.
+4. If all N iteration items are completed and actionable feedback still remains, carry the unresolved points forward to Step 4.
 
 Mark `Step 3: Plan Review` as `completed`.
 
@@ -146,7 +148,7 @@ Mark `Step 3: Plan Review` as `completed`.
 
 ### Step 8: Code Review -- MANDATORY, DO NOT SKIP
 
-Mark `Step 8: Code Review` as `in_progress`. Process each pending iteration item (Step 8-1, 8-2, 8-3) in order:
+Mark `Step 8: Code Review` as `in_progress`. Process each pending iteration item (Step 8-1 through 8-N) in order:
 
 1. Mark the iteration item as `in_progress`. Call the reviewer skill resolved in Step 1 (e.g. `Skill(ask-peer)`): Review code changes.
    - Include `git diff <base-commit>` (base-commit recorded in Step 2) to capture all changes since workflow start
@@ -161,7 +163,7 @@ Mark `Step 8: Code Review` as `in_progress`. Process each pending iteration item
    - the latest `git diff <base-commit>`
    - a summary of fixes made and rejections with reasons
    - the same three-category structure, `.claude/rules/` reference, and "No actionable findings" requirement
-4. If all 3 iteration items are completed and actionable feedback still remains, present the unresolved points to user for decision.
+4. If all N iteration items are completed and actionable feedback still remains, present the unresolved points to user for decision.
 
 Mark `Step 8: Code Review` as `completed`.
 
