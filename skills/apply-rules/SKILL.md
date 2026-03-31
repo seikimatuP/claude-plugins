@@ -1,7 +1,7 @@
 ---
 name: apply-rules
 description: Apply organization-wide rules (from merge-rules output) to the current project. Detects relevant languages/frameworks/integrations from the project's tech stack, merges with existing rules while preserving project-specific .local.md files, and cleans up non-conforming rule files. Use when onboarding a project to org standards, syncing rules after org-wide rule updates, or bootstrapping .claude/rules/ for a new project. Trigger whenever the user mentions applying org rules, syncing shared rules, importing team coding standards, or setting up project rules from a shared source.
-allowed-tools: Read, Glob, Grep, Write, Bash(ls *), Bash(mkdir *), Bash(wc *), Bash(mktemp *), Bash(rm -rf /var/folders/*), Bash(rm -rf /tmp/*), Bash(rm .claude/*), Bash(gh api *), Bash(gh auth status *)
+allowed-tools: Read, Glob, Grep, Write, AskUserQuestion, Bash(ls *), Bash(mkdir *), Bash(wc *), Bash(mktemp *), Bash(rm -rf /var/folders/*), Bash(rm -rf /tmp/*), Bash(rm .claude/*), Bash(gh api *), Bash(gh auth status *)
 ---
 
 # Apply Rules
@@ -148,13 +148,13 @@ Read `references/detection-heuristics.md` for the full detection table mapping i
 **If `auto_detect: true` (default):**
 
 1. **Auto-matched rules**: Rules that match detected tech stack → apply automatically
-2. **Integration proposals**: For integrations NOT detected in the project but related to a detected framework (e.g., source has `integrations/rails-pundit` but project doesn't use `pundit`), present them to the user:
+2. **Integration proposals**: For integrations NOT detected in the project but related to a detected framework (e.g., source has `integrations/rails-pundit` but project doesn't use `pundit`), use `AskUserQuestion` to present them as a single list:
 
-   > The following integration rules are available in the source but were not detected in your project. Would you like to apply any of them?
-   > - `integrations/rails-pundit` — Authorization library Pundit rules
-   > - `integrations/rails-good-job` — Job queue GoodJob rules
+   > The following integration rules are available in the source but were not detected in your project. Which would you like to apply?
+   > 1. `integrations/rails-pundit` — Authorization library Pundit rules
+   > 2. `integrations/rails-good-job` — Job queue GoodJob rules
    >
-   > These are useful if you plan to adopt these libraries or want to familiarize with org coding standards in advance.
+   > Options: all / none / specify by number (e.g. "1" or "1,2")
 
    Apply only those the user approves.
 
@@ -174,8 +174,12 @@ Before merging, align target file names with source (canonical) names. This prev
 
 1. Compare target file names against source file names within the same category
 2. Detect naming variants: singular/plural (`controller`/`controllers`), minor differences for the same concept
-3. If a target file matches a source file by content/`paths:` overlap but has a different name, rename the target to match the source (canonical) name
-4. Report all renames in the summary
+3. If renames are detected, use `AskUserQuestion` to confirm:
+   > The following target files will be renamed to match source (canonical) names:
+   > 1. `frameworks/rails-controller.md` → `frameworks/rails-controllers.md`
+   >
+   > Options: all / none / specify by number
+4. Apply approved renames and report in the summary
 
 ### Step 6: Merge Rules
 
@@ -199,14 +203,19 @@ For each filtered source rule file, determine the merge action:
    - Source principle not in target → Add
    - Target principle not in source → Keep (project may have added its own)
    - Same principle, same meaning but different hints → Union hints from both
-   - Same principle name but different content → Present both versions to the user and ask which to adopt:
-     > The following principle differs between org rules and project rules. Which should be used?
-     > - **Org:** `Immutability (spread, map/filter/reduce, const)`
-     > - **Project:** `Immutability (freeze, deep clone, readonly)`
+   - Same principle name but different content → Collect all conflicts, then use `AskUserQuestion` to present them together:
+     > The following principles differ between org rules and project rules:
      >
-     > 1. Adopt org rule
-     > 2. Keep project rule
-     > 3. Keep both
+     > **1. Immutability** (in `languages/ruby.md`)
+     > - Org: `Immutability (spread, map/filter/reduce, const)`
+     > - Project: `Immutability (freeze, deep clone, readonly)`
+     >
+     > **2. Error handling** (in `frameworks/rails.md`)
+     > - Org: `Error handling (rescue, custom exceptions)`
+     > - Project: `Error handling (rescue, retry, circuit breaker)`
+     >
+     > For each, choose: (a) Adopt org rule / (b) Keep project rule / (c) Keep both
+     > Example: "1a, 2c" or "all a"
 4. **`## Project-specific patterns` from source**:
    Promoted patterns from org rules belong in `.local.md`, not `.md`, because `.md` is reserved for portable principles. Keeping this boundary clean ensures that when this project's rules flow back into merge-rules, portable and local content don't get mixed.
    - If target has a `.local.md` → Append promoted patterns not already present
@@ -254,14 +263,17 @@ Scan `output_dir` for files that don't conform to extract-rules/merge-rules conv
 **Non-conforming file handling:**
 1. Read the non-conforming file and analyze its content
 2. Determine the appropriate conforming file(s) to migrate rules into (based on category, content, and `paths:` hints)
-3. Present the migration plan to the user for confirmation:
+3. Use `AskUserQuestion` to present the migration plan as a single list for confirmation:
    > The following non-conforming files were detected. Migrate their rules to conforming files and delete them?
-   > - `frameworks/old-custom-rules.md` → migrate to `frameworks/rails.md`
-   > - `ruby-rules.md` → migrate to `languages/ruby.md`
+   > 1. `frameworks/old-custom-rules.md` → migrate to `frameworks/rails.md`
+   > 2. `ruby-rules.md` → migrate to `languages/ruby.md`
+   > 3. `project.rules.md` → migrate to `project.md` (**project file — confirm individually**)
+   >
+   > Options: all / none / specify by number (e.g. "1,2")
+   >
+   > Note: `project.*` files are excluded from "all". Specify them individually by number.
 4. User approval → merge rules into conforming file(s) and delete non-conforming files
 5. Report all migrations and deletions
-
-**Note:** `project.*` files (e.g., `project.rules.md`) require extra caution — always confirm individually with the user before migrating or deleting.
 
 ### Step 8: Cleanup
 
@@ -319,11 +331,12 @@ Summary of user-confirmation points and automatic actions:
 | Principle in source, not in target | Auto-add |
 | Principle in target, not in source | Auto-keep |
 | Same principle, different hints | Auto-union hints |
-| Same principle name, different content | **Ask user**: adopt org / keep project / keep both |
+| Same principle name, different content | **AskUserQuestion**: collect all conflicts, present together (adopt org / keep project / keep both) |
 | Promoted pattern not in target `.local.md` | Auto-append (duplicate check by inline code signature) |
 | Promoted pattern already in `.local.md` | Auto-skip |
-| Non-conforming file detected | **Ask user**: confirm migration and deletion |
-| `project.*` non-conforming file | **Ask user**: confirm individually |
-| Undetected integration rule (related framework) | **Ask user**: propose for approval |
+| Non-conforming file detected | **AskUserQuestion**: present migration plan as single list for confirmation |
+| `project.*` non-conforming file | Excluded from "all" — must be specified individually by number |
+| Target file name differs from source canonical name | **AskUserQuestion**: confirm renames (all / none / specify) |
+| Undetected integration rule (related framework) | **AskUserQuestion**: present as single list for approval (all / none / specify) |
 | Existing `.local.md` content | Never modified (append-only for promoted patterns) |
 | Existing `.examples.md` project-specific examples | Never removed (append-only for new promoted pattern examples) |

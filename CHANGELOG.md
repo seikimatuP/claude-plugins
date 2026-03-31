@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-04-01
+
+### apply-rules v1.1.0
+
+- feat: Add `AskUserQuestion` to `allowed-tools` for explicit user confirmation at decision points
+  - Step 4 (Integration proposals): batched list with `all / none / number` selection
+  - Step 5.5 (File name normalization): confirm renames before applying
+  - Step 6 (Principle conflicts): collect all conflicts, present together with `1a, 2c` format
+  - Step 7 (Non-conforming files): migration plan as single list, `project.*` excluded from "all"
+- feat: Update Conflict Handling table to reflect all `AskUserQuestion` usage points
+
 ## 2026-03-31
 
 ### apply-rules v1.0.0
