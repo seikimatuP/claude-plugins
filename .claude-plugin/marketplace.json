@@ -134,6 +134,17 @@
         "name": "hiropon"
       },
       "category": "workflow"
+    },
+    {
+      "name": "apply-rules",
+      "description": "Apply organization-wide rules to projects (filter by tech stack, merge with existing rules)",
+      "source": "./",
+      "skills": ["./skills/apply-rules"],
+      "version": "1.0.0",
+      "author": {
+        "name": "hiropon"
+      },
+      "category": "workflow"
     }
   ]
 }

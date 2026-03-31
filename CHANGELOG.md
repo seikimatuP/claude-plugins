@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-03-31
+
+### apply-rules v1.0.0
+
+- feat: New skill to apply organization-wide rules (merge-rules output) to any project
+  - Source specification via GitHub URL or local path (direct path to rules directory)
+  - Auto-detect project tech stack (languages, frameworks, integrations) to filter relevant rules
+  - Intelligent merge: `.md` (Principles) merged, `.local.md` preserved, promoted patterns routed to `.local.md`
+  - Integration proposal: suggest unused but related integration rules for user approval
+  - Structure conformance check: migrate non-conforming rule files with user confirmation
+  - Fetch from GitHub via `gh api` (no git clone authentication issues)
+  - Dry-run mode for previewing changes
+
 ## 2026-03-30
 
 ### dev-workflow v1.14.0 / dev-workflow-bundle v1.14.0
