@@ -2,6 +2,15 @@
 
 ## 2026-04-01
 
+### dev-workflow v1.15.0
+
+- fix: Strengthen plan approval flow to prevent premature user approval before plan review
+  - Step 2: Explicitly forbid presenting plan or asking for approval/confirmation (bold + caps emphasis)
+  - Step 3: Add internal review declaration — do not present plan to user during review iterations
+  - Step 4: Add `(USER APPROVAL GATE)` to heading, mark as first time user sees the plan
+  - Step 4: Add re-review condition — return to Step 3 with new iteration item if user requests material scope/approach changes
+  - Step 4: Require explicit user acceptance before proceeding
+
 ### apply-rules v1.1.0
 
 - feat: Add `AskUserQuestion` to `allowed-tools` for explicit user confirmation at decision points

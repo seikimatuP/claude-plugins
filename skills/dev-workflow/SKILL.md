@@ -87,9 +87,11 @@ Read `references/init-mode.md` and follow the procedure.
 2. `EnterPlanMode`
 3. Analyze the task and codebase, create implementation plan (must include test plan: what to test, test types, scope — or why no tests are needed)
 4. **No code changes in this phase**
-5. Do not ask the user to approve the plan yet. Proceed to Step 3 first for plan review.
+5. Do not present the plan to the user or ask for approval/confirmation — presenting an unreviewed plan wastes user time and risks approval of a suboptimal approach. Immediately proceed to Step 3. The user will see the reviewed plan in Step 4.
 
 ### Step 3: Plan Review
+
+This step is an internal review — the reviewer refines the plan before the user sees it, so the user receives a higher-quality plan in Step 4. Do not present the plan to the user or ask for feedback during this step.
 
 Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item (Step 3-1 through 3-N) in order:
 
@@ -109,11 +111,11 @@ Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item
 
 Mark `Step 3: Plan Review` as `completed`.
 
-### Step 4: Finalize Plan
+### Step 4: Finalize Plan (USER APPROVAL GATE)
 
-1. Present the reviewed plan to the user (include any unresolved review points from Step 3)
-2. Collaborate with the user to refine the plan as needed (normal Plan Mode interaction)
-3. After the user accepts, `ExitPlanMode` and begin implementation
+1. **This is the first time the user sees the plan.** Present the reviewed plan to the user (include any unresolved review points from Step 3)
+2. Collaborate with the user to refine the plan as needed (normal Plan Mode interaction). If the user requests material changes to scope or approach, add a new review iteration item (e.g. Step 3-(N+1)) and return to Step 3 to process it before asking for acceptance.
+3. Wait for explicit user acceptance. After the user accepts, `ExitPlanMode` and begin implementation
 
 ### Step 5: Implement
 
