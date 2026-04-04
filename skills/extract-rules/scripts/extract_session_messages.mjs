@@ -13,8 +13,8 @@
  *
  * Options:
  *   --output           Output file path (default: stdout)
- *   --max-chars        Total output character cap (default: 100000)
- *   --max-per-message  Per-message character cap (default: 2000)
+ *   --max-chars        Total output character cap (default: no limit)
+ *   --max-per-message  Per-message character cap (default: no limit)
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -141,8 +141,8 @@ const main = () => {
     allowPositionals: true,
     options: {
       output: { type: "string", short: "o" },
-      "max-chars": { type: "string", default: "100000" },
-      "max-per-message": { type: "string", default: "2000" },
+      "max-chars": { type: "string" },
+      "max-per-message": { type: "string" },
     },
   });
 
@@ -154,8 +154,8 @@ const main = () => {
     process.exit(1);
   }
 
-  const maxChars = parseNonNegativeInt(values["max-chars"], "--max-chars");
-  const maxPerMessage = parseNonNegativeInt(values["max-per-message"], "--max-per-message");
+  const maxChars = values["max-chars"] ? parseNonNegativeInt(values["max-chars"], "--max-chars") : Infinity;
+  const maxPerMessage = values["max-per-message"] ? parseNonNegativeInt(values["max-per-message"], "--max-per-message") : Infinity;
 
   // Entire file loaded into memory — acceptable for typical session files up to ~10MB
   const lines = readFileSync(sessionFile, "utf-8").split("\n");

@@ -18,8 +18,8 @@ The script handles:
 - Parsing each JSON line and filtering to `type: "user"` and `type: "assistant"` only
 - Extracting text from `message.content` (both string and array formats), skipping `tool_use`, `thinking` blocks
 - Recovering user responses from interactive tools (`AskUserQuestion`, etc.) — these `tool_result` entries contain explicit user preferences and are high-value signals
-- Truncating each message to 2000 characters
-- Capping total output at 100,000 characters, prioritizing recent messages (latest-first collection, so older messages are dropped first). The newest message is always kept (truncated to fit if needed)
+- By default, all messages are included without size limits
+- Optional `--max-chars` and `--max-per-message` flags to cap output size if needed (prioritizes recent messages — oldest are dropped first; newest message is always kept even if partially truncated)
 - Outputting in chronological order with `=== {role} ===` delimiters
 
 **Cleanup:** Delete the output file after reading it to avoid leaving conversation data on disk:

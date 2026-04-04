@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-04
+
+### extract-rules v1.10.1 / dev-workflow-bundle v1.18.2
+
+- feat: Remove default size limits from `extract_session_messages.mjs` — all messages included by default
+  - `--max-chars` and `--max-per-message` are now optional (default: no limit)
+  - Previously defaulted to 100K chars / 2000 chars per message
+
 ## 2026-04-03
 
 ### extract-rules v1.10.0 / dev-workflow-bundle v1.18.1
