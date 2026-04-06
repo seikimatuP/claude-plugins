@@ -2,6 +2,13 @@
 
 ## 2026-04-06
 
+### dev-workflow v1.20.0 / dev-workflow-bundle v1.20.0
+
+- feat(dev-workflow): Add `custom_instructions` configuration for injecting user-defined development instructions
+  - Free-form string applied to planning (Step 2), plan review (Step 3), implementation (Step 5), simplify (Step 6), and code review (Step 8)
+  - Configured via `dev-workflow.local.md` YAML frontmatter
+  - `.claude/rules/` and explicit user requests take precedence over `custom_instructions`
+
 ### dev-workflow v1.19.0 / dev-workflow-bundle v1.19.0
 
 - feat(dev-workflow): Add hooks configuration for executing skills/commands at workflow timing points
