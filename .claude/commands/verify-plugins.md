@@ -1,7 +1,7 @@
 ---
 description: Verify all plugins structure, versions, and execute skill/agent tests
 argument-hint: [--full]
-allowed-tools: Read, Glob, Grep, Bash(jq *), Bash(for *), Bash(echo *), Bash(if *), Bash(head *), Bash(do *), Skill(test-skills), Skill(check-cli-updates)
+allowed-tools: Read, Glob, Grep, Bash(jq *), Bash(for *), Bash(echo *), Bash(if *), Bash(head *), Bash(do *), Bash(ls *), Bash(readlink *), Bash(test *), Skill(test-skills), Skill(check-cli-updates)
 ---
 
 # Verify Plugins
@@ -18,45 +18,35 @@ allowed-tools: Read, Glob, Grep, Bash(jq *), Bash(for *), Bash(echo *), Bash(if 
 ## 対象ファイル
 
 - `.claude-plugin/marketplace.json` - プラグインマニフェスト
-- `skills/*/` - スキル専用ディレクトリ（anthropics/skillsパターン）
-- `plugins/*/` - エージェント依存プラグインディレクトリ
+- `skills/*/` - スキル実体ディレクトリ
+- `plugins/*/` - プラグインsourceディレクトリ
 
 ## 検証項目
 
-### 1. ファイル存在確認
+### 1. スキル実体の存在確認（skills/配下）
 
-#### スキル専用（skills/配下）
+`skills/*/SKILL.md` が存在することを確認。
 
-| スキル | SKILL.md |
-|--------|----------|
-| ask-claude | skills/ask-claude/SKILL.md |
-| ask-codex | skills/ask-codex/SKILL.md |
-| ask-gemini | skills/ask-gemini/SKILL.md |
-| ask-copilot | skills/ask-copilot/SKILL.md |
-| security-scanner | skills/security-scanner/SKILL.md |
-| extract-rules | skills/extract-rules/SKILL.md |
-| merge-rules | skills/merge-rules/SKILL.md |
-| ask-peer | skills/ask-peer/SKILL.md |
+### 2. プラグインsourceディレクトリの構造確認（plugins/配下）
 
-#### エージェント依存プラグイン（plugins/配下）
+marketplace.json の全プラグインについて:
+- `source` で指定されたディレクトリが存在すること
+- `plugins/<name>/skills/` 配下にスキルへのシンボリックリンクが存在すること
+- シンボリックリンクの参照先（`skills/` 配下の実体）が存在すること
 
-| プラグイン | plugin.json | スキル | エージェント |
-|-----------|-------------|--------|------------|
-| translate | plugins/translate/.claude-plugin/plugin.json | skills/tr/SKILL.md | agents/tr.md, agents/tr-hq.md |
-| caffeinate | plugins/caffeinate/.claude-plugin/plugin.json | skills/caffeinate/SKILL.md | N/A |
+### 3. バージョン整合性
 
-### 2. バージョン整合性
+marketplace.json の全プラグインについて:
+- `plugin.json` が存在するプラグイン: marketplace.json と plugin.json のバージョンが一致すること
+- `plugin.json` が存在しないプラグイン: marketplace.json のバージョンのみ確認
 
-`marketplace.json` と各 `plugin.json` のバージョンが一致することを確認。
-（スキル専用はバージョン管理なし）
-
-### 3. 構文検証
+### 4. 構文検証
 
 - 各 `plugin.json` が有効なJSONであること
 - 各 `SKILL.md` にYAMLフロントマターが存在すること
 - 各エージェント定義ファイルにYAMLフロントマターが存在すること
 
-### 4. スキル・エージェント動作確認
+### 5. スキル・エージェント動作確認
 
 各プラグイン/スキルの機能が正常に動作することを確認。
 
@@ -66,21 +56,33 @@ allowed-tools: Read, Glob, Grep, Bash(jq *), Bash(for *), Bash(echo *), Bash(if 
 
 `.claude-plugin/marketplace.json` を読み込み、登録されている全プラグインをリストアップしてください。
 
-### Step 2: ファイル存在確認
+### Step 2: スキル実体の存在確認
 
-上記の表に従って、各スキル/プラグインの必須ファイルが存在することを確認してください。
-Globを使って効率的に確認できます。
+`skills/*/SKILL.md` を Glob で列挙し、marketplace.json に登録された全スキルの実体が存在することを確認してください。
 
-### Step 3: バージョン整合性チェック
+### Step 3: プラグインsourceディレクトリの構造確認
 
-**plugins/配下のプラグイン（translate, caffeinate）**：
+marketplace.json の各プラグインについて:
+1. `source` ディレクトリが存在すること
+2. `plugins/<name>/skills/` 配下のエントリがシンボリックリンクであること
+3. シンボリックリンクの参照先が存在し、SKILL.md を含むこと
+
+```bash
+# シンボリックリンク確認例
+ls -la plugins/<name>/skills/
+readlink plugins/<name>/skills/<skill-name>
+test -f plugins/<name>/skills/<skill-name>/SKILL.md
+```
+
+### Step 4: バージョン整合性チェック
+
+marketplace.json の全プラグインについて:
 1. marketplace.json のバージョンを取得
-2. plugin.json のバージョンを取得
-3. 一致を確認
+2. `plugins/<name>/.claude-plugin/plugin.json` が存在する場合、そのバージョンを取得し一致を確認
 
 不一致がある場合は警告として記録してください。
 
-### Step 4: JSON構文検証
+### Step 5: JSON構文検証
 
 各 `plugin.json` について `jq` で構文チェック：
 
@@ -88,11 +90,11 @@ Globを使って効率的に確認できます。
 jq . plugins/<plugin>/.claude-plugin/plugin.json > /dev/null
 ```
 
-### Step 5: フロントマター存在確認
+### Step 6: フロントマター存在確認
 
 各 `SKILL.md` と エージェントファイルの先頭が `---` で始まることを確認してください。
 
-### Step 6: スキル・エージェント動作テスト
+### Step 7: スキル・エージェント動作テスト
 
 **Skillツールを使って `test-skills` スキルを呼び出してください。**
 
@@ -102,14 +104,14 @@ Skill(skill: "test-skills")
 
 このスキルでは以下がテストされます：
 
-- 各スキル動作（/ask-claude, /ask-codex, /ask-gemini, /ask-copilot, /ask-peer, /tr, /security-scanner）
+- 各スキル動作（/ask-claude, /ask-codex, /ask-gemini, /ask-copilot, /ask-peer, /tr, /caffeinate, /security-scanner）
 - 各エージェント動作（tr, tr-hq）
 - 外部CLI依存のスキルは、CLIがインストールされていない場合スキップ
 
-### Step 7: CLI更新確認（`--full` 指定時のみ）
+### Step 8: CLI更新確認（`--full` 指定時のみ）
 
 **`--full` オプションが指定された場合のみ**、このステップを実行してください。
-指定されていない場合は、このステップをスキップして Step 8 に進んでください。
+指定されていない場合は、このステップをスキップして Step 9 に進んでください。
 
 ```text
 Skill(skill: "check-cli-updates")
@@ -121,34 +123,32 @@ Skill(skill: "check-cli-updates")
 - SKILL.mdに記載されているオプションの有効性
 - 非推奨オプションや新機能の確認
 
-### Step 8: 結果サマリー
+### Step 9: 結果サマリー
 
 以下の形式で結果を報告してください：
 
 ```
 ## 検証結果
 
-### ファイル存在（スキル専用）
+### スキル実体
 | スキル | SKILL.md | 状態 |
 |--------|----------|------|
 | ask-claude | ✅ | ✅ |
-| ask-codex | ✅ | ✅ |
-| ask-gemini | ✅ | ✅ |
-| ask-copilot | ✅ | ✅ |
-| ask-peer | ✅ | ✅ |
-| security-scanner | ✅ | ✅ |
+| ... | ... | ... |
 
-### ファイル存在（エージェント依存プラグイン）
-| プラグイン | plugin.json | スキル | エージェント | 状態 |
-|-----------|-------------|--------|------------|------|
-| translate | ✅ | ✅ | ✅ | ✅ |
-| caffeinate | ✅ | ✅ | N/A | ✅ |
+### プラグインsourceディレクトリ
+| プラグイン | source存在 | skills/シンボリックリンク | 参照先存在 | 状態 |
+|-----------|-----------|----------------------|----------|------|
+| ask-claude | ✅ | ✅ | ✅ | ✅ |
+| ... | ... | ... | ... | ... |
 
 ### バージョン整合性
 | プラグイン | marketplace | plugin.json | 状態 |
 |-----------|-------------|-------------|------|
-| translate | 1.0.0 | 1.0.0 | ✅ |
+| translate | 1.1.1 | 1.1.1 | ✅ |
 | caffeinate | 1.0.0 | 1.0.0 | ✅ |
+| ask-claude | 1.1.3 | N/A | ✅ |
+| ... | ... | ... | ... |
 
 ### 構文検証
 | 対象 | JSON | フロントマター | 状態 |
@@ -156,26 +156,13 @@ Skill(skill: "check-cli-updates")
 | translate | ✅ | ✅ | ✅ |
 | caffeinate | ✅ | ✅ | ✅ |
 | ask-claude | N/A | ✅ | ✅ |
-| ask-codex | N/A | ✅ | ✅ |
-| ask-gemini | N/A | ✅ | ✅ |
-| ask-copilot | N/A | ✅ | ✅ |
-| security-scanner | N/A | ✅ | ✅ |
-| extract-rules | N/A | ✅ | ✅ |
-| merge-rules | N/A | ✅ | ✅ |
+| ... | ... | ... | ... |
 
 ### 動作テスト
 | 対象 | スキル/エージェント | 結果 | 備考 |
 |------|-------------------|------|------|
 | ask-claude | /ask-claude | ✅/⚠️/N/A | 正常動作/エラー内容/CLI未インストール |
-| ask-codex | /ask-codex | ✅/⚠️/N/A | ... |
-| ask-gemini | /ask-gemini | ✅/⚠️/N/A | ... |
-| ask-copilot | /ask-copilot | ✅/⚠️/N/A | ... |
-| peer | /ask-peer | ✅/⚠️ | ... |
-| translate | /tr | ✅/⚠️ | ... |
-| translate | tr agent | ✅/⚠️ | ... |
-| translate | tr-hq agent | ✅/⚠️ | ... |
-| caffeinate | /caffeinate | ✅/⚠️ | ... |
-| security-scanner | /security-scanner | ✅/⚠️ | ... |
+| ... | ... | ... | ... |
 
 ### 総合結果
 ✅ 全スキル/プラグインが正常です / ⚠️ N件の問題が見つかりました

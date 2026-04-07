@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-04-07
+
+### All plugins (patch version bump)
+
+- fix: Isolate plugin source directories to prevent duplicate skill registration
+  - Each plugin now has its own `plugins/<name>/` source directory with symlinks to `skills/`
+  - Previously all plugins shared `source: "./"`, causing Claude Code to auto-discover all skills for every plugin
+  - Workaround for [anthropics/claude-code#13344](https://github.com/anthropics/claude-code/issues/13344)
+- docs: Update CLAUDE.md to reflect new plugin structure and skill addition flow
+
 ## 2026-04-06
 
 ### dev-workflow v1.20.0 / dev-workflow-bundle v1.20.0

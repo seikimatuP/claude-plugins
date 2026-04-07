@@ -8,26 +8,27 @@ Claude Code用プラグインを公開するためのマーケットプレイス
 .
 ├── .claude-plugin/
 │   └── marketplace.json      # プラグインマニフェスト
-├── skills/                   # スキル専用（Skills.sh + マーケットプレイス両対応）
+├── skills/                   # SKILL.mdの実体（正規ファイル）
 │   └── <skill-name>/
-│       └── SKILL.md          # 正規ファイル（二重管理なし）
-├── plugins/                  # エージェント依存プラグインのみ
+│       └── SKILL.md
+├── plugins/                  # 全プラグインのsourceディレクトリ
 │   └── <plugin-name>/
-│       ├── .claude-plugin/
-│       │   └── plugin.json
 │       ├── skills/
-│       │   └── <skill-name>/
-│       │       └── SKILL.md
-│       ├── agents/
+│       │   └── <skill-name>  # → ../../../skills/<skill-name> (シンボリックリンク)
+│       ├── .claude-plugin/   # (エージェント依存プラグインのみ)
+│       │   └── plugin.json
+│       ├── agents/           # (エージェント依存プラグインのみ)
 │       │   └── <agent-name>.md
-│       └── README.md
+│       └── README.md         # (エージェント依存プラグインのみ)
 ├── .claude/
 │   ├── commands/             # 開発用コマンド
-│   ├── skills/               # スキルへのシンボリックリンク
+│   ├── skills/               # 開発・テスト用シンボリックリンク
 │   └── agents/               # エージェントへのシンボリックリンク
 ├── CHANGELOG.md              # 変更履歴
 └── README.md                 # リポジトリ説明
 ```
+
+**注意:** 各プラグインは `plugins/` 配下に専用のsourceディレクトリを持つ必要がある。`source: "./"` を使うと、`skills/` 配下の全スキルが自動発見されて重複登録される。
 
 ## スキル追加フロー（エージェント非依存）
 
@@ -54,45 +55,62 @@ allowed-tools: Read, Glob, Grep
 スキルの詳細な説明と使い方
 ```
 
-### 3. marketplace.json の skills 配列に追加
+### 3. プラグインのsourceディレクトリ作成
 
-`.claude-plugin/marketplace.json` の `hiropon-skills` プラグインの `skills` 配列に追加:
+```bash
+mkdir -p plugins/<plugin-name>/skills
+ln -s ../../../skills/<skill-name> plugins/<plugin-name>/skills/<skill-name>
+```
+
+### 4. marketplace.json に追加
+
+`.claude-plugin/marketplace.json` の `plugins` 配列に追加:
 
 ```json
 {
-  "name": "hiropon-skills",
-  "source": "./",
-  "skills": [
-    "./skills/ask-claude",
-    "./skills/<skill-name>"  // 追加
-  ]
+  "name": "<plugin-name>",
+  "source": "./plugins/<plugin-name>",
+  "description": "スキルの説明",
+  "version": "1.0.0",
+  "author": { "name": "hiropon" },
+  "category": "workflow"
 }
 ```
 
-### 4. シンボリックリンク作成
+### 5. 開発・テスト用シンボリックリンク作成
 
 ```bash
 ln -s ../../skills/<skill-name> .claude/skills/<skill-name>
 ```
 
-### 5. CHANGELOG.md 更新
+### 6. CHANGELOG.md 更新
 
 ## プラグイン追加フロー（エージェント依存）
 
 エージェントを必要とするプラグインの場合:
 
-### 1. plugins/ディレクトリにプラグイン作成
+### 1. skills/ディレクトリにスキル作成＋プラグインディレクトリ作成
 
 ```
+skills/<skill-name>/
+└── SKILL.md
+
 plugins/<plugin-name>/
 ├── .claude-plugin/
 │   └── plugin.json
 ├── skills/
-│   └── <skill-name>/
-│       └── SKILL.md
+│   └── <skill-name>  # → ../../../skills/<skill-name> (シンボリックリンク)
 ├── agents/
 │   └── <agent-name>.md
 └── README.md
+```
+
+```bash
+# スキル実体は skills/ に配置
+mkdir -p skills/<skill-name>
+# プラグインディレクトリからシンボリックリンク
+mkdir -p plugins/<plugin-name>/skills
+ln -s ../../../skills/<skill-name> plugins/<plugin-name>/skills/<skill-name>
 ```
 
 ### 2. plugin.json
@@ -128,11 +146,11 @@ plugins/<plugin-name>/
 }
 ```
 
-### 4. シンボリックリンク作成
+### 4. 開発・テスト用シンボリックリンク作成
 
 ```bash
 # スキル
-ln -s ../../plugins/<plugin-name>/skills/<skill-name> .claude/skills/<skill-name>
+ln -s ../../skills/<skill-name> .claude/skills/<skill-name>
 
 # エージェント
 ln -s ../../plugins/<plugin-name>/agents/<agent-name>.md .claude/agents/<agent-name>.md
