@@ -164,7 +164,7 @@ Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item
    - If `custom_instructions` is configured, include the instructions text in the review request and have the reviewer verify alignment and report conflicts
    - Reviewer should only report actionable findings. If none, explicitly state "No actionable findings"
 2. If reviewer returned "No actionable findings": mark this and remaining iteration items as `completed` (skip). Mark `Step 3: Plan Review` as `completed` and proceed to Step 4.
-3. Otherwise: apply improvements, reject inapplicable points with reason. Mark this iteration item as `completed`.
+3. Otherwise: autonomously apply improvements or reject inapplicable points with reason — do not ask the user for judgment on individual review findings. Mark this iteration item as `completed`.
    - If the plan was modified: continue to the next pending iteration item (back to step 1). Plan modifications often introduce new gaps or ripple effects that the previous reviewer had no chance to see — the re-review round-trip is cheap compared to shipping a plan that looks fine to the author but has an unvetted section. Don't short-circuit even when the fixes feel airtight
    - If all points were rejected (no modifications): mark remaining iteration items as `completed` (skip — there is nothing new for the next reviewer to look at)
    Continue to the next pending iteration item with:
@@ -234,7 +234,7 @@ Mark `Step 8: Code Review` as `in_progress`. Process each pending iteration item
    - If `custom_instructions` is configured, include the instructions text in the review request and have the reviewer verify compliance and report conflicts
    - Reviewer should only report actionable findings. If none, explicitly state "No actionable findings"
 2. If reviewer returned "No actionable findings": mark this and remaining iteration items as `completed` (skip). Mark `Step 8: Code Review` as `completed` and proceed to Step 9.
-3. Otherwise: fix genuine issues, reject inapplicable points with reason. Mark this iteration item as `completed`.
+3. Otherwise: autonomously fix genuine issues or reject inapplicable points with reason — do not ask the user for judgment on individual review findings. Mark this iteration item as `completed`.
    - If code was modified: re-run Step 7 and Step 7.5 (with same base-commit from Step 2), then continue to the next pending iteration item (back to step 1). Code fixes routinely introduce fresh bugs, tighten one place while loosening another, or miss a caller the author didn't know about — the next review round is how those leaks get caught. Don't short-circuit based on confidence in the fix itself
    - If all points were rejected (no modifications): mark remaining iteration items as `completed` (skip — there is nothing new for the next reviewer to look at)
    Continue to the next pending iteration item with:

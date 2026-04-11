@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-11
+
+### dev-workflow v1.25.1 / dev-workflow-bundle v1.25.1
+
+- fix(dev-workflow): Explicitly instruct autonomous judgment on review findings
+  - Step 3 (Plan Review) and Step 8 (Code Review) now explicitly state "autonomously ... do not ask the user for judgment on individual review findings"
+  - Addresses issue where the model deferred to the user on every review finding instead of autonomously applying fixes or rejecting inapplicable points
+  - Final fallback to user (Step 3.4 / Step 8.4 for unresolved points after all iterations) remains unchanged
+
 ## 2026-04-10
 
 ### dev-workflow v1.25.0 / dev-workflow-bundle v1.25.0
