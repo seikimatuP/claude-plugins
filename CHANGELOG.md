@@ -2,6 +2,18 @@
 
 ## 2026-04-18
 
+### dev-workflow v1.29.0 / dev-workflow-bundle v1.29.0
+
+- feat(dev-workflow): Add Step 9.5 Self-Retrospective (Phase 1 — bundle-skill improvement signal)
+  - New optional config key `self_retrospective.feedback` (string). When set, a new Step 9.5 runs between Step 9 (Update Rules) and Step 10 (Completion Hooks), scanning the current conversation for improvement signals about the bundled skills (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`), sanitizing them, and submitting to a user-configured destination
+  - Destination is auto-detected from the `feedback` string: `owner/repo` pattern → GitHub issue via `gh issue create`; paths starting with `/`, `~/`, `./`, `../` → a markdown file under that directory; any other value → warn and skip
+  - Raw conversation (jsonl) stays in-session — only abstracted, project-agnostic text leaves. Explicit sanitization rules cover absolute paths, project/repo/product/user names, project-specific code identifiers, and dates/IDs/URLs. User preview + approve/edit/skip loop is always shown before submission
+  - Skipped entirely when `self_retrospective.feedback` is unset or invalid (Step 9.5 not registered in TodoWrite). Also hard-skipped when Step 2 assesses the task as Simple difficulty (typo fix, config tweak), regardless of config — Simple tasks rarely exercise the bundled skills enough to produce meaningful signal
+  - Repo-mode runs an early `gh auth status` check at Step 1 as a warning only, so the user is alerted up front that Step 9.5 will abort later; Step 9.5 re-checks and aborts with an actionable message as a backstop
+  - Issue title is fixed as `[auto-retrospective] dev-workflow-bundle: <N> findings (<YYYY-MM-DD>)` so downstream automation can filter reliably; no default label
+  - Full procedure (pre-flight, extraction, sanitization, submission, error handling) lives in `references/self-retrospective.md` (mirrors the Step 1.5 → `task-decomposition.md` deep-reference pattern)
+  - Phase 2 (local skill-ification candidates from conversation scan, with create/edit/skip approval UX that writes directly under `.claude/skills/`) is intentionally deferred to a follow-up release (planned 1.30.0). Phase 1 ships the retrospective infrastructure; Phase 2 adds the higher-risk file-creation flow with name validation, allowed-tools constraints, and SKILL.md syntax validation
+
 ### dev-workflow v1.28.0 / dev-workflow-bundle v1.28.0
 
 - feat(dev-workflow): Refine Step 1.5 decomposition heuristic toward independently-verifiable units

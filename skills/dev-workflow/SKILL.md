@@ -1,7 +1,7 @@
 ---
 name: dev-workflow
 description: Guided development workflow that orchestrates plan → review → implement → check/test → code review → rules update. Use this skill whenever the user wants to develop a feature, fix a bug, refactor code, or make any code changes following a structured process — even if they don't explicitly mention "workflow" and simply describe what they want built or fixed.
-allowed-tools: Read, Write, Edit, Glob, Grep, TodoWrite, EnterPlanMode, ExitPlanMode, Skill(ask-peer), Skill(ask-claude), Skill(ask-codex), Skill(ask-gemini), Skill(ask-copilot), Skill(extract-rules), Skill(simplify), Skill(run-tests), Skill(rules-review), Bash(pwd), Bash(mkdir -p .claude/plans), Bash(rm .claude/plans/*), Bash(pnpm run *), Bash(pnpm exec *), Bash(npm run *), Bash(yarn run *), Bash(bun run *), Bash(bundle exec *), Bash(make lint *), Bash(make format *), Bash(make test *), Bash(make typecheck *), Bash(make check *), Bash(python -m pytest *), Bash(poetry run *), Bash(uv run *), Bash(cargo test *), Bash(cargo clippy *), Bash(cargo fmt *), Bash(go test *), Bash(go vet *), Bash(git diff *), Bash(git status *), Bash(git rev-parse *), Bash(test -f *)
+allowed-tools: Agent, Read, Write, Edit, Glob, Grep, TodoWrite, EnterPlanMode, ExitPlanMode, Skill(ask-peer), Skill(ask-claude), Skill(ask-codex), Skill(ask-gemini), Skill(ask-copilot), Skill(extract-rules), Skill(simplify), Skill(run-tests), Skill(rules-review), Bash(pwd), Bash(mkdir -p .claude/plans), Bash(rm .claude/plans/*), Bash(pnpm run *), Bash(pnpm exec *), Bash(npm run *), Bash(yarn run *), Bash(bun run *), Bash(bundle exec *), Bash(make lint *), Bash(make format *), Bash(make test *), Bash(make typecheck *), Bash(make check *), Bash(python -m pytest *), Bash(poetry run *), Bash(uv run *), Bash(cargo test *), Bash(cargo clippy *), Bash(cargo fmt *), Bash(go test *), Bash(go vet *), Bash(git diff *), Bash(git status *), Bash(git rev-parse *), Bash(test -f *), Bash(gh issue create *), Bash(gh auth status)
 ---
 
 # Dev Workflow
@@ -49,6 +49,8 @@ test_commands:
 hooks:
   on_complete:
     - "Skill(work-complete)"
+self_retrospective:
+  feedback: "owner/repo"        # or "/abs/path", "~/rel", "./rel"
 ---
 ```
 
@@ -61,6 +63,14 @@ hooks:
 - **hooks**: Execute skills/commands at specific workflow timing points
   - **on_complete**: Runs after Step 9. Entry format: `Skill(<name>)` or shell command string
   - Entries not covered by allowed-tools require user approval
+- **self_retrospective**: Optional. Emits sanitized improvement signal for the `dev-workflow-bundle` skills (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`) at Step 9.5 (between Step 9 and Step 10). Raw conversation stays in-session; only abstracted text leaves
+  - **feedback**: Destination string. Auto-detected:
+    - Starts with `/`, `~/`, `./`, or `../` → local directory path → retrospective written as a markdown file under that directory
+    - Matches `^[\w.-]+/[\w.-]+$` → GitHub `owner/repo` → retrospective submitted via `gh issue create`
+    - Any other string (including empty) → warn and skip Step 9.5
+  - If `feedback` is unset, Step 9.5 is not registered in TodoWrite and never executes — the workflow behaves as before
+  - Step 9.5 is also hard-skipped when Step 2 assesses the task as **Simple** difficulty (typo fix, config tweak, obvious bug fix), regardless of config — Simple tasks rarely produce meaningful bundle-skill signal
+  - **`Agent` tool usage**: Step 9.5 is the only step in this skill that directly spawns a subagent via the `Agent` tool (for jsonl scan + sanitization). Other steps delegate to named skills (`Skill(ask-peer)`, `Skill(run-tests)`, `Skill(rules-review)`, `Skill(simplify)`, etc.), never to `Agent` directly. Do not invoke `Agent` from any other step.
 
 ## Mode Detection
 
@@ -102,7 +112,7 @@ Read `references/init-mode.md` and follow the procedure.
    1. If `-i` / `--iterations` option is present and is a positive integer, use it
    2. Else if config `review_iterations` is present and is a positive integer, use it
    3. Else use default `3`
-5. Parse `hooks` from config. Warn and ignore if `hooks.on_complete` has invalid format. Parse `custom_instructions` from config (optional, string). Warn and ignore if not a string. Parse `task_decomposition` from config (optional, boolean, default `true`). Warn and fall back to `true` if present but not a boolean
+5. Parse `hooks` from config. Warn and ignore if `hooks.on_complete` has invalid format. Parse `custom_instructions` from config (optional, string). Warn and ignore if not a string. Parse `task_decomposition` from config (optional, boolean, default `true`). Warn and fall back to `true` if present but not a boolean. Parse `self_retrospective.feedback` from config (optional, string). Warn and ignore if not a string or if empty string `""`. When `feedback` matches the `owner/repo` pattern (`^[\w.-]+/[\w.-]+$`), additionally run `gh auth status` as an early warning only — if auth fails, warn but do not block the run
 6. Determine execution sub-mode: **Resume** if `--resume <state-file>` was provided, otherwise **Normal**. Step 1.5 branches on this
 7. Register all workflow phases with `TodoWrite`, including review iterations. Do NOT skip any phase:
    - **Step 1.5: Task Decomposition** (Normal sub-mode only, AND only when `task_decomposition` is `true` — omit this entry entirely in Resume sub-mode or when `task_decomposition` is `false`, since in either case the step has nothing to do at registration time)
@@ -117,6 +127,7 @@ Read `references/init-mode.md` and follow the procedure.
    - Step 8: Code Review
    - Step 8-1 through Step 8-N: Code Review - iteration 1 through N (generate N items based on resolved N)
    - Step 9: Update Rules
+   - Step 9.5: Self-Retrospective (only if `self_retrospective.feedback` is set and parses as a valid destination — see Step 9.5 for detection rules; if unset/invalid, omit this entry)
    - Step 10: Completion Hooks (only if `hooks.on_complete` is configured)
    Mark each item `in_progress` when starting and `completed` when done. Registering all phases upfront gives the user visibility into overall progress and prevents steps from being accidentally dropped. Implementation sub-tasks in Step 5 are additions, not replacements.
    Note: Unless `-i` / `--iterations` was explicitly specified, Step 2 may reduce N based on task difficulty.
@@ -151,7 +162,7 @@ After section A or B completes, the "effective task" is set for Step 2 onward: t
    - **Simple** (typo fix, config tweak, straightforward bug fix with obvious solution): N = 1
    - **Moderate** (multi-file within one module, feature following existing patterns): N = min(2, N)
    - **Complex** (cross-module, new patterns, API changes, significant refactoring): keep N
-   File count is a hint, not the sole criterion. If adjusted, mark excess TodoWrite iteration items (Step 3-x and Step 8-x) as `completed`. Log the assessed difficulty and effective N.
+   File count is a hint, not the sole criterion. If adjusted, mark excess TodoWrite iteration items (Step 3-x and Step 8-x) as `completed`. Log the assessed difficulty and effective N. If the difficulty is **Simple** and the Step 9.5 TodoWrite row exists (i.e. `self_retrospective.feedback` is configured), additionally mark that row as `completed` with note `skipped: Simple task`.
 7. Do not present the plan to the user or ask for approval/confirmation — presenting an unreviewed plan wastes user time and risks approval of a suboptimal approach. Proceed to Step 3. The user will see the reviewed plan in Step 4.
 
 ### Step 3: Plan Review
@@ -256,6 +267,12 @@ Mark `Step 8: Code Review` as `completed`.
 1. `Skill(extract-rules)` with `--from-conversation` (always)
 2. `Skill(extract-rules)` with `--update` (only if significant structural/pattern changes occurred)
 3. If extract-rules is unavailable, skip this step and inform user
+
+### Step 9.5: Self-Retrospective
+
+Emit a sanitized improvement signal for the `dev-workflow-bundle` skills (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`) to a user-configured destination. Raw conversation jsonl stays in-session; only abstracted, project-agnostic text leaves.
+
+Skip this step if `self_retrospective.feedback` is unset/invalid (Step 1 did not register the row) or the task was assessed Simple (Step 2.6 pre-marked the row `completed`). Otherwise read [`references/self-retrospective.md`](references/self-retrospective.md) and follow the procedure from top to bottom.
 
 ### Step 10: Completion Hooks
 
