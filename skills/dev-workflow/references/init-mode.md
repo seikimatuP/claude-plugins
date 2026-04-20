@@ -4,6 +4,12 @@
 2. Detect package manager from lock files (JS/TS only)
 3. Infer check_commands for the detected project type
    - Detect static checks (lint, format, typecheck, etc.)
+   - **TypeScript multi-tsconfig handling**:
+     - Scan `tsconfig*.json` files **directly under the project root only** — do not recurse into `packages/*` / `apps/*` (workspace territory, user-configured)
+     - Exclude tsconfigs whose name signals a non-typecheck role (e.g. `tsconfig.eslint.json`, `tsconfig.*.test.json`, `tsconfig.vitest.json`)
+     - To detect `references: [...]` on the root `tsconfig.json`, use the `Read` tool and parse the file as JSONC (strip `//` / `/* */` comments and trailing commas before checking the `references` key). Avoid shelling out to `tsc --showConfig` or `grep`: the former needs tooling not in `allowed-tools`, the latter false-hits inside `//`-commented blocks
+     - Trigger: **2 or more** tsconfigs remain after exclusion, or the root `tsconfig.json` resolves to a non-empty `references` array
+     - Action: register one type-check command per tsconfig in `check_commands`, matching the detected package manager so it fits the `allowed-tools` `Bash(<pm> run *)` / `Bash(<pm> exec *)` globs — e.g. `pnpm exec tsc -p tsconfig.app.json --noEmit` for pnpm projects, or add per-tsconfig scripts in `package.json` and use `<pm> run typecheck:<name>` for npm/yarn/bun. (Per-tsconfig `-p` was chosen over `tsc -b --noEmit` for universal compatibility; see CHANGELOG entry for the design rationale.) Present the generated command list to the user in Step 6 for confirmation so any environment mismatch is caught before the config is saved
 4. Determine test_commands (dev-workflow always uses `Skill(run-tests)` as the canonical test skill):
    a. **Check existing `run-tests` skill**: Look for `.claude/skills/run-tests/SKILL.md`
       - **Current format** (Agent tool in allowed-tools + subagent execution pattern + three-status return contract + `--base-commit` input contract): use as-is, skip generation. However, offer to regenerate if any of these gaps are detected:

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-04-20
+
+### dev-workflow v1.30.0 / dev-workflow-bundle v1.30.0
+
+- feat(dev-workflow): Strengthen Simple classification, add external-library primary-source verification, close multi-tsconfig coverage gap, and open a runtime trigger for examples.md staleness review (retrospective-2026-04-20 findings F1/F2/F3/F4)
+  - Step 2.6: Simple escalates to at least Moderate when the change touches an external library's configuration file or type-level API AND that library has had a recent major-version bump. The check is a quick `git diff <base-commit>` on the project's package manifest looking for major version changes. Similar qualitative risks (external config-DSL rewrites, etc.) follow the same rule. Mechanical check + qualitative trigger are combined so stale-config failures after a major upgrade cannot slip through the Simple path
+  - Step 3 Plan Review: added a new category (e) **External library primary-source verification** (independent of category (a) so it gets its own reviewer checklist slot). When the plan touches an external library's API, configuration DSL, configuration file, enabled options, or type-level behavior — interpreted broadly so plugin activation and option tweaks count — reviewers must treat in-project references (`.examples.md`, `.local.md`, existing implementations) as secondary and require the plan to cite at least one primary source (installed type definitions, package source, or official reference docs). If the primary source cannot be consulted in the current environment (missing installed deps, no web access), the item is flagged in the plan as a stale-API concern instead of being trusted silently. Step 8 is not changed — the check is scoped to the planning gate to avoid noise at code review
+  - Step 7: notes that TypeScript Project References / multi-tsconfig setups can leave changed files uncovered by `check_commands`. `--init` now auto-registers per-tsconfig `tsc -p <path> --noEmit` when 2+ tsconfigs or `references: [...]` are detected. The per-tsconfig form was chosen over `tsc -b --noEmit` because the latter is only supported on TypeScript ≥ 5.6; per-tsconfig `-p` is universally compatible and needs no version probing
+  - Step 9: `--update` now additionally triggers when a dependency's major-version bump is detected via `git diff <base-commit>` on the package manifest (same signal as Step 2.6). This opens the runtime path for finding F3 — without this trigger the extract-rules Update Mode operational note was documented but never read in practice, because `--update` only ran on "significant structural/pattern changes"
+  - Step 9.5: Simple hard-skip is now overridable by an explicit user request **within the same session** (e.g. "run the retrospective for this run anyway"). The manual re-run runs the `references/self-retrospective.md` procedure from §1 without updating TodoWrite (the Step 9.5 row stays `completed`) and prompts the user to re-verify the session jsonl selection at §1.4. Cross-session re-runs are not supported — once the workflow session has ended, the Step 2.6 difficulty assessment cannot be recovered. `references/self-retrospective.md`:7 was rewritten to define both the normal read path and the manual-re-run read path consistently
+  - README.md sync: the Simple row now carries the major-bump exception as a footnote, and the Hard-skip-on-Simple section is retitled "overridable on explicit request" with invocation example
+  - Out of scope (deferred): a lightweight coverage-check sub-step that warns when a changed file is not covered by any `check_command`. Out of scope for this release — the `--init` improvement closes the most common TypeScript instance, and a generic coverage-check step needs more design
+
+### extract-rules v1.12.0
+
+- docs(extract-rules): Operational note for post-major-version updates (retrospective-2026-04-20 finding F3)
+  - Update Mode now opens with an operational note: after a dependency's major-version bump, run `--update` so the staleness check (Step U3) can flag removed symbols. The note also makes explicit that the current Step U3 check only inspects inline `` `symbol` `` patterns in `## Project-specific patterns` sections (`.local.md`) — code samples inside `.examples.md` are **not** auto-scanned. Manual review of `.examples.md` is required after a major bump; otherwise stale configuration samples there can silently propagate into future plans via reviewers treating project examples as authoritative
+  - `--restructure` is not recommended for post-major-bump sync (it does not run a staleness check)
+  - Out of scope: Restructure / Conversation / PR-Review mode ripple of the staleness check, fenced-code-block parser for `.examples.md`. Not addressed in this release
+
+Note: `apply-rules` and `merge-rules` are **not** bumped. The `extract-rules` output format is unchanged by this release, and neither SKILL.md references dev-workflow / extract-rules content directly, so their behavior is unaffected.
+
 ## 2026-04-18
 
 ### dev-workflow v1.29.0 / dev-workflow-bundle v1.29.0

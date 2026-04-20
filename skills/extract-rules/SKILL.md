@@ -315,6 +315,8 @@ Display analysis summary. See `references/report-templates.md` for format.
 
 When `--update` is specified, re-scan the codebase and add new patterns while preserving existing rules.
 
+**Operational note**: After a dependency's major-version bump, run `--update` so the Step U3 staleness check flags removed symbols. The check only scans inline `` `symbol` `` in `.local.md`'s `## Project-specific patterns` — `.examples.md` is not auto-scanned, so manually review it for the affected framework(s). Stale samples there propagate via reviewers trusting project examples as authoritative. `--restructure` is not a substitute here: it reorganizes files without running the staleness check.
+
 ### Step U1: Load Settings and Check Prerequisites
 
 1. Load settings from `extract-rules.local.md` (same as Step 1 in Full Extraction Mode)
@@ -384,6 +386,8 @@ Report what was added per file. Also report any stale rules found in Step U3. Se
 ## Restructure Mode
 
 When `--restructure` is specified, re-analyze the codebase to determine the optimal file structure, then merge existing rule content into the new structure. Use this when the project has evolved (new frameworks, architectural changes), when `split_output` settings change, or after updating the extract-rules skill itself.
+
+**Note**: Restructure Mode does NOT run the Step U3 staleness check — use `--update` first so stale symbols are flagged for manual review (see the Update Mode operational note for the post-major-version-bump workflow).
 
 ### Step R1: Load Settings and Snapshot Existing Rules
 

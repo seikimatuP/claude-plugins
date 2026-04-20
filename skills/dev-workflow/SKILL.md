@@ -159,7 +159,7 @@ After section A or B completes, the "effective task" is set for Step 2 onward: t
    - For each element that fails the audit, either (i) drop it from the plan, or (ii) add an explicit one-line rationale tying it to a concrete trigger (user requirement / bug / rule).
 5. **No code changes in this phase**
 6. **Adjust N by difficulty** (skip if `-i` / `--iterations` was explicitly specified): A typo fix doesn't need 3 rounds of review. Based on the plan just created, assess task difficulty and reduce N to avoid unnecessary iterations — the configured value is a ceiling, not a target:
-   - **Simple** (typo fix, config tweak, straightforward bug fix with obvious solution): N = 1
+   - **Simple** (typo fix, config tweak, straightforward bug fix with obvious solution): N = 1 — **unless** the change touches an external library's config file or type-level API AND that library had a recent major-version bump (primary check: `git diff <base-commit>` of the package manifest; if absent in this run, judge from other context since the bump may predate this run); then classify as at least Moderate. Similar qualitative risks (external config-DSL rewrites, etc.) follow the same rule. Purely cosmetic edits (comments, whitespace, auto-formatting) do not trigger the exception — use judgment
    - **Moderate** (multi-file within one module, feature following existing patterns): N = min(2, N)
    - **Complex** (cross-module, new patterns, API changes, significant refactoring): keep N
    File count is a hint, not the sole criterion. If adjusted, mark excess TodoWrite iteration items (Step 3-x and Step 8-x) as `completed`. Log the assessed difficulty and effective N. If the difficulty is **Simple** and the Step 9.5 TodoWrite row exists (i.e. `self_retrospective.feedback` is configured), additionally mark that row as `completed` with note `skipped: Simple task`.
@@ -173,11 +173,12 @@ Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item
 
 1. Mark the iteration item as `in_progress`. Call the reviewer skill resolved in Step 1 (e.g. `Skill(ask-peer)`): Review the plan.
    - Instruct reviewer to read all files under `.claude/rules/` for project conventions
-   - Request feedback organized into four categories:
+   - Request feedback organized into five categories:
      a. **Scope & feasibility**: verify the author's Step 2 simplicity self-audit (each plan element should already tie back to an explicit user requirement, known bug, or documented rule — flag only elements where the rationale is weak, missing, or looks like speculative "future-proofing" or unnecessary abstraction), dependencies, risks, `.claude/rules/` compliance
      b. **Approach & alternatives**: simpler methods, architectural fit with existing code
      c. **Completeness**: edge cases, error handling, test plan adequacy (verify specific test files are identified and existing related tests are covered for update)
      d. **Incrementality**: can this plan be split into smaller, independently verifiable units (e.g. hotfix vs refactor)? Step 1.5 checked at request level; this is the plan-level check — concrete plans often bundle independent work even when the task looks single-concern. If splittable, propose the split and order. For PR-level splits (distinct verification / rollback / regression attribution), recommend restarting via Step 1.5; for intra-PR splits, recommend staged commits
+     e. **External library primary-source verification**: if the plan adopts or adjusts usage of an **external library's** API, configuration DSL, configuration file, enabled options, or type-level behavior (interpret broadly within that scope — plugin activation and option tweaks count, not just direct API calls; but **project-internal configuration decisions that happen to sit in a library's config file — e.g. toggling a style preference like tsconfig `strict` — are out of scope for this category**, since they carry no library-version-compatibility risk), treat in-project references (`.examples.md`, `.local.md`, existing implementations) as secondary since they can go stale after a dependency upgrade. Require the plan to cite at least one primary source — the language's most authoritative installed source (installed type definitions, package source, official reference docs). If the primary source cannot be consulted in this environment (missing installed deps, no web access), flag the item explicitly as a stale-API concern in the plan rather than silently trusting secondary material
    - If `custom_instructions` is configured, include the instructions text in the review request and have the reviewer verify alignment and report conflicts
    - Reviewer should only report actionable findings. If none, explicitly state "No actionable findings"
 2. If reviewer returned "No actionable findings": mark this and remaining iteration items as `completed` (skip). Mark `Step 3: Plan Review` as `completed` and proceed to Step 4.
@@ -187,7 +188,7 @@ Mark `Step 3: Plan Review` as `in_progress`. Process each pending iteration item
    Continue to the next pending iteration item with:
    - the updated plan
    - a summary of changes made and rejections with reasons
-   - the same four-category structure, `.claude/rules/` reference, and "No actionable findings" requirement
+   - the same five-category structure, `.claude/rules/` reference, and "No actionable findings" requirement
 4. If all N iteration items are completed and actionable feedback still remains, carry the unresolved points forward to Step 4.
 
 Mark `Step 3: Plan Review` as `completed`.
@@ -216,6 +217,8 @@ Implementation often introduces unnecessary complexity that's easier to spot in 
    - The skill handles scope decision and test execution internally via subagent
    - Returns structured summary: SUCCESS / TEST_FAILED / EXECUTION_ERROR
 3. After 3 retries, report to user and stop
+
+> **Coverage note (TypeScript multi-tsconfig)**: For projects with Project References or multiple `tsconfig*.json` files, a single `tsc --noEmit` may miss changed files that belong to other tsconfigs. `--init` auto-registers a per-tsconfig `tsc -p <path> --noEmit` in this case (see `references/init-mode.md` for detection rules). If coverage still looks incomplete, re-run `--init` or append the missing command manually.
 
 > **GATE**: Verify Steps 2-7 are completed (check TodoWrite status; if status is inconsistent, verify actual completion by reviewing work done). Mark Step 7.5 as `in_progress`.
 
@@ -265,7 +268,7 @@ Mark `Step 8: Code Review` as `completed`.
 ### Step 9: Update Rules
 
 1. `Skill(extract-rules)` with `--from-conversation` (always)
-2. `Skill(extract-rules)` with `--update` (only if significant structural/pattern changes occurred)
+2. `Skill(extract-rules)` with `--update` (trigger on either: significant structural/pattern changes occurred, OR a dependency had a recent major-version bump — i.e. the semver major digit increased in the manifest, not a minor / patch — detected via `git diff <base-commit>` of the package manifest. The same signal used in Step 2.6. The major-bump trigger opens the extract-rules Update Mode operational note, which prompts manual review of `.examples.md` samples that may have gone stale after the bump)
 3. If extract-rules is unavailable, skip this step and inform user
 
 ### Step 9.5: Self-Retrospective
@@ -273,6 +276,8 @@ Mark `Step 8: Code Review` as `completed`.
 Emit a sanitized improvement signal for the `dev-workflow-bundle` skills (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`) to a user-configured destination. Raw conversation jsonl stays in-session; only abstracted, project-agnostic text leaves.
 
 Skip this step if `self_retrospective.feedback` is unset/invalid (Step 1 did not register the row) or the task was assessed Simple (Step 2.6 pre-marked the row `completed`). Otherwise read [`references/self-retrospective.md`](references/self-retrospective.md) and follow the procedure from top to bottom.
+
+**Manual re-run (same-session only)**: If the task was assessed Simple and Step 9.5 was auto-skipped, and the user in the same session explicitly requests Step 9.5 execution (e.g. "run the retrospective for this run anyway"), bypass the Simple hard-skip and follow `references/self-retrospective.md` from §1. Do **not** update the already-`completed` TodoWrite row. At §1.4, confirm with the user that the auto-detected session jsonl matches the intended run (multi-instance setups may pick the wrong one). Cross-session re-runs are unsupported: once the session ends, the Step 2.6 assessment and in-memory context are lost. The override covers only the Simple hard-skip — an unset or invalid `self_retrospective.feedback` still blocks Step 9.5 (those gates are about missing destination, not difficulty).
 
 ### Step 10: Completion Hooks
 

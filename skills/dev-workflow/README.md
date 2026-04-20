@@ -187,6 +187,8 @@ Automatic adjustment by task difficulty (evaluated in Step 2):
 | Moderate | Multi-file changes within one module, feature following existing patterns | `N = min(2, N)` |
 | Complex | Cross-module, new patterns, API changes, significant refactoring | Keep configured value |
 
+**Exception to Simple**: a change that touches an external library's configuration file or type-level API is classified at least Moderate (not Simple) when the library has had a recent major-version bump. The primary detection is a `git diff` against the base commit on the project's package manifest; when that misses (e.g. the bump landed in a previous task), rely on `git log` on the manifest or conversational context for the same signal. This protects against stale configuration examples being adopted under the Simple heuristic's weakened review iterations.
+
 If `-i N` is explicitly specified, auto-adjustment is skipped. The configured value is a **ceiling**, not a target.
 
 #### `task_decomposition`
@@ -273,7 +275,7 @@ self_retrospective:
   feedback: "~/retrospectives/dev-workflow"
 ```
 
-**Hard-skip on Simple tasks**: Step 9.5 is automatically skipped when Step 2 assesses the task as Simple difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple tasks rarely produce meaningful bundle-skill signal.
+**Hard-skip on Simple tasks (overridable on explicit request)**: Step 9.5 is automatically skipped when Step 2 assesses the task as Simple difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple tasks rarely produce meaningful bundle-skill signal. If you later decide the skip was wrong, you can ask the assistant in the same session to "run the retrospective for this run anyway" — the skill will bypass the Simple hard-skip and execute the Step 9.5 procedure without touching TodoWrite. Cross-session re-runs are not supported.
 
 **User preview + approval is always required**. Before submission, the assembled body is shown to the user along with a destination header (mode / resolved value / settings layer source). The user can `approve`, `edit` (revise inline), or `skip`. In repo mode, an additional explicit confirmation of `<owner/repo>` is asked before `gh issue create` runs — this is a defense against a malicious commit to the git-tracked `.claude/dev-workflow.md` silently redirecting retrospectives.
 
@@ -444,7 +446,7 @@ The workflow begins at Step 2 (Step 1 is settings load, Step 1.5 is task decompo
 | 7.5 | Rules Compliance Review | Verify `.claude/rules/` compliance via `rules-review` skill |
 | 8 | Code Review | Code review by reviewer (up to N iterations) |
 | 9 | Update Rules | Update rules via `extract-rules` |
-| 9.5 | Self-Retrospective | (Only if `self_retrospective.feedback` is set and difficulty is not Simple) Spawn a subagent to extract sanitized bundle-skill improvement signal, present it with a destination header, and submit on user approval. See `references/self-retrospective.md` |
+| 9.5 | Self-Retrospective | (Only if `self_retrospective.feedback` is set and difficulty is not Simple; or manually re-requested in the same session after a Simple auto-skip) Spawn a subagent to extract sanitized bundle-skill improvement signal, present it with a destination header, and submit on user approval. See `references/self-retrospective.md` |
 | 10 | Completion Hooks | Run `hooks.on_complete` (only if configured) |
 
 ## Prerequisites

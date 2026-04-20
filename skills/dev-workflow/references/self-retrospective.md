@@ -4,7 +4,7 @@ Deep reference for Step 9.5. Read this when `self_retrospective.feedback` is set
 
 Purpose: scan the current conversation for signals about how the bundled skills (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`) performed, produce **sanitized**, project-agnostic improvement candidates, and submit them to the configured destination — either a GitHub issue (`owner/repo` feedback) or a local markdown file (path feedback). Raw conversation stays in-session.
 
-If the execution-time gates in SKILL.md already marked Step 9.5 skipped (unset `feedback`, invalid `feedback`, or Simple difficulty), this file is not read.
+This file is read in two paths: (a) **normal execution** — `self_retrospective.feedback` is set at Step 1 and the task is not Simple at Step 2; (b) **manual re-run** — the user explicitly requests Step 9.5 in the same session after an auto-skip (see SKILL.md Step 9.5 "Manual re-run" for invocation semantics). Path (b) bypasses only the Simple hard-skip; unset / invalid `feedback` still blocks reading this file.
 
 ## 1. Pre-flight checks
 
@@ -36,7 +36,7 @@ If the execution-time gates in SKILL.md already marked Step 9.5 skipped (unset `
    - Encode the path: replace `/` and `.` with `-` (leading `-` is kept). Example: `/Users/alice/projects/foo` → `-Users-alice-projects-foo`.
    - Expand `~` to the literal `$HOME` value before constructing the Glob pattern — `Glob` does not guarantee tilde expansion, so always pass an absolute path.
    - Use `Glob` with pattern `<$HOME>/.claude/projects/<encoded-path>/*.jsonl`. `Glob` returns results sorted by modification time (newest first), so pick the first entry.
-   - The "latest-modified" heuristic can pick the wrong file when multiple Claude Code instances are running against the same repo. Inform the user which file was selected so they can catch a mismatch at §4 preview time (user can `skip` if the session is wrong).
+   - The "latest-modified" heuristic can pick the wrong file when multiple Claude Code instances are running against the same repo. Inform the user which file was selected so they can catch a mismatch at §4 preview time (user can `skip` if the session is wrong). **In the manual-re-run path (SKILL.md Step 9.5 override)**, make this check explicit — tell the user the selected jsonl path at §1.4 and wait for confirmation before proceeding, since the override bypasses the automatic "not-Simple" guard that normally correlates session boundaries.
    - If the glob returns no matches, abort Step 9.5 with a warning ("No session jsonl found for this repo — Step 9.5 requires conversation history to scan.") and emit the terminal summary (0 findings, skipped).
 
 Every abort in this section emits the terminal summary as `skipped` — pre-flight never produces a `failed` state, which is reserved for submission attempts that were actually made (section 5).
