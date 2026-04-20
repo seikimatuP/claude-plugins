@@ -10,6 +10,7 @@ This document is the **configuration reference**. For the internal specification
 - Pluggable reviewer (ask-peer / ask-claude / ask-codex / ask-gemini / ask-copilot)
 - Automatically adjusts review iteration count based on task difficulty
 - **Task decomposition**: Large tasks can be split into subtasks (each delivered as its own PR), with resume support across sessions
+- **Self-retrospective** (opt-in): After a run, emits a sanitized improvement signal for the bundled skills to a GitHub issue or a local markdown file — helps the skill set itself improve over time. Raw conversation never leaves the session
 - Can run custom skills / shell commands as completion hooks
 
 ## Usage
@@ -158,6 +159,7 @@ hooks:
 | `check_commands` | list&lt;string&gt; | (none) | Static checks (lint / format / typecheck, etc.) |
 | `test_commands` | list&lt;string&gt; | `["Skill(run-tests)"]` | Test execution (fixed) |
 | `hooks.on_complete` | list&lt;string&gt; | (none) | Hooks to run after Step 9 |
+| `self_retrospective.feedback` | string | (none) | Destination for Step 9.5 self-retrospective output (GitHub `owner/repo` or a local directory path). Unset = Step 9.5 is fully skipped |
 
 ### Details
 
@@ -245,6 +247,40 @@ hooks:
 
 Commands not covered by `allowed-tools` require user approval at runtime. Invalid formats are ignored with a warning. Hook failures do not stop the workflow — errors are recorded as warnings and remaining hooks continue executing.
 
+#### `self_retrospective.feedback`
+
+Opt-in feedback channel that turns on **Step 9.5: Self-Retrospective**. After a normal run, a subagent scans the session's conversation for signals about how the bundled skills (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`) performed, sanitizes the findings, and submits them to the configured destination. The raw conversation (jsonl) never leaves the session — only abstracted, project-agnostic text is emitted.
+
+Unset by default. When unset, Step 9.5 is never registered and the workflow behaves exactly as before. When set, the destination is auto-detected from the string shape:
+
+| Shape of `feedback` | Mode | Behavior |
+| --- | --- | --- |
+| Starts with `/`, `~/`, `./`, `../` | **path** | Write a markdown file `<feedback>/dev-workflow-retrospective-<YYYY-MM-DD>-<slug>.md` |
+| Matches `^[\w.-]+/[\w.-]+$` | **repo** | Submit via `gh issue create --repo <feedback>` (requires `gh` installed and authenticated) |
+| Anything else (incl. empty) | — | Warn and skip Step 9.5 |
+
+Examples:
+
+```yaml
+# Repo mode — retrospective goes to the specified GitHub repo as an issue
+self_retrospective:
+  feedback: "owner/repo"
+```
+
+```yaml
+# Path mode — retrospective goes to a local directory (created if needed on approval)
+self_retrospective:
+  feedback: "~/retrospectives/dev-workflow"
+```
+
+**Hard-skip on Simple tasks**: Step 9.5 is automatically skipped when Step 2 assesses the task as Simple difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple tasks rarely produce meaningful bundle-skill signal.
+
+**User preview + approval is always required**. Before submission, the assembled body is shown to the user along with a destination header (mode / resolved value / settings layer source). The user can `approve`, `edit` (revise inline), or `skip`. In repo mode, an additional explicit confirmation of `<owner/repo>` is asked before `gh issue create` runs — this is a defense against a malicious commit to the git-tracked `.claude/dev-workflow.md` silently redirecting retrospectives.
+
+**Sanitization**: absolute paths, project / repo / product / user names, project-specific code identifiers, dates / session IDs / ticket IDs / internal URLs, and credential-like literals (API keys, tokens, email addresses, IPs, `.env` values) are stripped before the body is shown. The preview is the final human catch-all; inspect carefully if you handle sensitive codebases.
+
+**Phase 2 (planned, not in this release)**: a separate follow-up will add observation C — proposing reusable local-skill candidates based on repeated patterns in the session, and, with user approval per candidate, creating new skills under `.claude/skills/`.
+
 ### Complete configuration examples
 
 #### Minimal (real example from this repository)
@@ -277,6 +313,8 @@ test_commands:
 hooks:
   on_complete:
     - "Skill(work-complete)"
+self_retrospective:
+  feedback: "owner/repo"   # or a local path like "~/retrospectives/dev-workflow"
 ---
 ```
 
@@ -406,6 +444,7 @@ The workflow begins at Step 2 (Step 1 is settings load, Step 1.5 is task decompo
 | 7.5 | Rules Compliance Review | Verify `.claude/rules/` compliance via `rules-review` skill |
 | 8 | Code Review | Code review by reviewer (up to N iterations) |
 | 9 | Update Rules | Update rules via `extract-rules` |
+| 9.5 | Self-Retrospective | (Only if `self_retrospective.feedback` is set and difficulty is not Simple) Spawn a subagent to extract sanitized bundle-skill improvement signal, present it with a destination header, and submit on user approval. See `references/self-retrospective.md` |
 | 10 | Completion Hooks | Run `hooks.on_complete` (only if configured) |
 
 ## Prerequisites
@@ -415,6 +454,7 @@ To get the full benefit of dev-workflow, the following skills are recommended:
 - **Reviewer skill** (specified via `reviewer` setting): Used for Plan / Code Review. If not installed, falls back to asking the user directly
 - **rules-review skill**: Required for Step 7.5 (rules compliance review). Step 7.5 is skipped if not installed
 - **extract-rules skill**: Required for Step 9 (rule update). Step 9 is skipped if not installed
+- **`gh` CLI, authenticated** (only if `self_retrospective.feedback` is set to an `owner/repo` value): required for Step 9.5 to submit via `gh issue create`. If `gh` is missing or unauthenticated, Step 9.5 aborts with an actionable message; switch `feedback` to a local path to disable the `gh` requirement
 
 ## Error / edge case behavior
 
@@ -435,6 +475,10 @@ To get the full benefit of dev-workflow, the following skills are recommended:
 | State file YAML parse error | Stops and instructs the user to back up and repair manually (no automatic recovery) |
 | State file has `depends_on` cycle or dangling id | Stops with a clear error describing the invalid edge |
 | Leftover `in_progress` subtask on resume | Asks the user whether to resume it or pick a different pending subtask |
+| `self_retrospective.feedback` not a string / empty / neither path nor `owner/repo` | Warns and skips Step 9.5 (workflow continues normally) |
+| `self_retrospective.feedback` is `owner/repo` but `gh auth status` fails | Early warning at Step 1; Step 9.5 aborts with an actionable message at runtime |
+| Step 9.5 subagent returns malformed / unsanitized content | Abort Step 9.5 with `skipped` terminal summary; no retry in the same session |
+| Step 9.5 submission (`gh issue create` / path `Write`) fails after approval | Report error + draft body in-chat so user can retry manually; terminal summary `failed`; workflow continues to Step 10 |
 
 ## Notes
 
