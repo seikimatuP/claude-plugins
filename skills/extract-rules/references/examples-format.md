@@ -77,7 +77,7 @@ When in doubt: ./<name>.examples.md
 
 ## Common Generation Procedure
 
-This procedure applies to all modes (Full Extraction, Update, Conversation, PR Review).
+This procedure applies to all modes (Full Extraction, Update, Restructure, Conversation, PR Review). After generation, run the Portability check (below).
 
 ### For Full Extraction / Restructure
 
@@ -92,3 +92,14 @@ For each new rule added:
 3. **For project-specific patterns**: Find actual usage sites in the codebase
 4. **If no relevant code can be found** (e.g., the rule is about something not yet implemented): skip the example for now
 5. Append to the `.examples.md` file. Create `.examples.md` if it doesn't exist
+
+## Portability check (post-generation)
+
+After writing each example + description, re-read the pair and ask: "Does this description hold for every call site of this pattern, or does it leak assumptions from the specific site it was mined from?"
+
+Common leaks:
+
+- **Test-file origin**: unit-test samples often describe the pattern in test-isolation terms. Either rewrite the description in production-contract terms with a production Good example, or add a `test-only` qualifier to the rule title
+- **Specific-site framing**: description references local variables / fixture names. Rewrite in terms of the pattern's contract
+
+Applies to all modes (Full Extraction, Update, Restructure, Conversation, PR Review).

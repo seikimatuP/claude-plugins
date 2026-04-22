@@ -156,6 +156,8 @@ After section A or B completes, the "effective task" is set for Step 2 onward: t
    - Each plan element must be traceable to one of: (a) an explicit user requirement, (b) a known bug or constraint, or (c) a documented project rule under `.claude/rules/`. "Future-proofing", "UX polish", "consistency with other projects", or "might be useful later" are not sufficient triggers on their own.
    - **Inherited spec files** (`.claude/plans/*.md` — full-spec drafts, archived plans, or AI-authored details within a task-decomposition state file): treat the content as a prior-session draft, not as confirmed user requirements. Cross-check each inherited design decision against the user's original ask surfaced by Step 1.5 / the user message — prior-session elaboration is the most common source of scope creep.
      - **Exception — task-decomposition state files**: subtask boundaries, order, `depends_on`, and purposes were user-approved in a prior Step 1.5 and must be honored as-is. Only AI-authored descriptions, verification hints, and design elaborations within each subtask are draft.
+   - **Root-cause provenance check**: if the plan leans on a root-cause claim from an AI-authored prior-session artifact, re-derive the root cause from the user's original ask before treating it as load-bearing. User-confirmed root causes are exempt.
+   - **Plan-level incrementality**: check whether the plan splits into independently verifiable units (e.g. hotfix vs refactor). If yes, propose the split now rather than deferring to Step 3 plan review — PR-level splits restart via Step 1.5, intra-PR splits become staged commits (same dispatch as Step 3's Incrementality review category).
    - For each element that fails the audit, either (i) drop it from the plan, or (ii) add an explicit one-line rationale tying it to a concrete trigger (user requirement / bug / rule).
 5. **No code changes in this phase**
 6. **Adjust N by difficulty** (skip if `-i` / `--iterations` was explicitly specified): A typo fix doesn't need 3 rounds of review. Based on the plan just created, assess task difficulty and reduce N to avoid unnecessary iterations — the configured value is a ceiling, not a target:
@@ -202,6 +204,7 @@ Mark `Step 3: Plan Review` as `completed`.
 ### Step 5: Implement
 
 1. Follow the plan, track progress with `TodoWrite`. Apply `custom_instructions` throughout implementation
+2. **Respect prior in-session edits**: content the user explicitly removed earlier in this session (comments, guards, logs) must not reappear. Treat deletion as authoritative, not as a gap to fill. This discipline applies when applying plan steps, when applying Step 6 simplify output, and when applying Step 8 review fixes — the reviewer/simplify subagents only see the diff and cannot enforce this themselves
 
 ### Step 6: Simplify
 
@@ -227,7 +230,7 @@ Implementation often introduces unnecessary complexity that's easier to spot in 
 Dedicated rules compliance check, separate from code review (Step 8). This ensures rule enforcement gets focused attention rather than competing with correctness and design concerns.
 
 1. `Skill(rules-review)` with `--base-commit <sha>` (base-commit recorded in Step 2) via `$ARGUMENTS`
-2. If result indicates no violations (e.g., "All rules compliant", "No applicable rules for changed files", "No changed files", "No rule files found"): mark completed, proceed to Step 8
+2. If result indicates no violations (e.g., "No rule violations found", "All rules compliant", "No applicable rules for changed files", "No changed files", "No rule files found"): mark completed, proceed to Step 8
 3. If violations found:
    a. Fix all reported violations
    b. Re-run Step 7 (Check / Test) to ensure fixes did not break anything
@@ -249,8 +252,8 @@ Mark `Step 8: Code Review` as `in_progress`. Process each pending iteration item
    - Thorough rules compliance has been verified in Step 7.5, but instruct reviewer to also flag any obvious `.claude/rules/` violations as a safety net — especially for code modified after Step 7.5
    - Request feedback organized into three categories:
      a. **Correctness & edge cases**: bugs, error handling gaps, race conditions, missing validations, missing or insufficient tests for changes (verify planned test files from Step 2 are present in the diff)
-     b. **Conventions & consistency**: naming, file structure, patterns, `.claude/rules/` compliance (lightweight check — Step 7.5 handles the thorough review)
-     c. **Simplicity & maintainability**: unnecessary complexity, duplication, unclear abstractions, speculative features without explicit trigger (functionality beyond what the stated requirement needs — flag for removal)
+     b. **Conventions & consistency**: naming, file structure, patterns, `.claude/rules/` compliance (lightweight check — Step 7.5 handles the thorough review). Comments: treat narration (line-by-line paraphrase) and preamble (restating surrounding context) as delete-candidates, not as gaps to expand with more rationale
+     c. **Simplicity & maintainability**: unnecessary complexity, duplication, unclear abstractions, speculative features without explicit trigger (functionality beyond what the stated requirement needs — flag for removal). Specifically: defensive hardening of already-safe paths, future-proofing for hypothetical double-calls, double-coverage over paths already protected elsewhere
    - If `custom_instructions` is configured, include the instructions text in the review request and have the reviewer verify compliance and report conflicts
    - Reviewer should only report actionable findings. If none, explicitly state "No actionable findings"
 2. If reviewer returned "No actionable findings": mark this and remaining iteration items as `completed` (skip). Mark `Step 8: Code Review` as `completed` and proceed to Step 9.
