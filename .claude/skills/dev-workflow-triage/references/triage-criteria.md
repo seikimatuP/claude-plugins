@@ -20,6 +20,8 @@ Reference loaded by `dev-workflow-triage` during the "Judge each Finding" step (
 5. **Large restructure**: the fix implies splitting a SKILL.md, introducing new section structure, reshuffling cross-skill responsibilities, or editing more than one file / creating new files. Not safe for a single-pass autonomous run.
 6. **Contradicts a deliberate design choice**: reading the target file shows the current behavior is intentional (documented in a comment, a Decisions section, a rule file, or a commit message). Reject and note the source.
 
+Note: the accept/reject checklist above is scoped to the triage judgment that runs before any edits. The subsequent `verify-diff` polish step empirically re-checks the applied diff against the Finding's stated objective, but its verdict does not retroactively change the accept decision — `verify-diff` can downgrade a Finding to `conflict` via safety rails, which is already covered by the edge-case dispatch table below.
+
 ## Edge-case dispatch table
 
 Quick reference for per-case dispositions. SKILL.md's procedural prose is authoritative for execution order; this table flattens the same information for faster scanning.
@@ -34,6 +36,11 @@ Quick reference for per-case dispositions. SKILL.md's procedural prose is author
 | Description text names a skill other than the declared `Target skill` | Per-Finding `reject` (out-of-scope target in description) |
 | Edit `old_string` not found (prior Finding's commit overwrote the region) | Per-Finding `conflict`; commit nothing; continue |
 | Edit leaves frontmatter broken | Per-Finding `conflict`; `git checkout HEAD -- <file>`; continue from clean tree |
+| verify-diff returns `converged` | Proceed to (d2) skill-review polish |
+| verify-diff returns `unresolved` (max iterations hit with gaps remaining) | Per-Finding warning `verify-diff unresolved (<n> gaps)`; proceed to (d2) |
+| verify-diff returns `skipped` (reason codes defined in `.claude/skills/verify-diff/SKILL.md` § Step 4) | Per-Finding warning `verify-diff skipped (<reason>)`; proceed to (d2) |
+| verify-diff returns `conflict` (reason codes defined in `.claude/skills/verify-diff/SKILL.md` § Step 4) | Per-Finding `conflict`; `git checkout HEAD -- <reverted_paths>` (idempotent safety re-run since verify-diff already reverted internally); skip (d2); continue |
+| 2 consecutive Findings with verify-diff `skipped` or `conflict` (counter resets on `converged` / `unresolved` — any successful-or-still-functioning return between errors breaks the streak) | Set `verify_diff_disabled=true`; skip verify-diff for rest of run; warn on each affected Finding |
 | skill-review returns no findings in ≤ 3 iterations | Proceed to commit |
 | skill-review still flags findings after 3 iterations | Proceed to commit; add warning `skill-review notes left (<n>)` in the comment |
 | skill-review returns an error response | Per-Finding warning `skill-review error (<reason>)`; skip polish for this Finding |
@@ -56,7 +63,7 @@ Use this shape when building the `--body-file` content in the "Post triage comme
 - **Category**: <ambiguity|missing-branch|wrong-default|rules-conflict|other>
 - **Reasoning**: <1-2 sentences in English>
 - **Applied changes**: <file:section> at <commit-hash> | `—`
-- **Notes** (optional, only if warnings): `skill-review notes left (<n>)`, `skill-review error (<reason>)`, `skill-review disabled after consecutive errors`
+- **Notes** (optional, only if warnings): `verify-diff unresolved (<n> gaps)`, `verify-diff skipped (<reason>)`, `verify-diff disabled after consecutive errors`, `skill-review notes left (<n>)`, `skill-review error (<reason>)`, `skill-review disabled after consecutive errors`
 
 ... repeat for each Finding in the issue ...
 
