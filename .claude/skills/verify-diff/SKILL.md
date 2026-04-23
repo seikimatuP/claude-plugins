@@ -1,7 +1,7 @@
 ---
 name: verify-diff
 description: Empirically verify that a code diff achieves its stated objective by dispatching a bias-free subagent. The subagent returns suggested edits as structured JSON, and this skill applies them iteratively up to max-iterations. Non-interactive — no user prompts. Use after applying an Edit when you need a dynamic cross-check that complements static reviewers like skill-review.
-allowed-tools: Read, Edit, Agent, Bash(git diff *), Bash(git checkout HEAD -- *)
+allowed-tools: Read, Edit, Agent, TodoWrite, Bash(git diff *), Bash(git checkout HEAD -- *)
 ---
 
 # Verify Diff
@@ -35,13 +35,15 @@ The caller must **not** stage changes while this skill is running. The skill rea
 
 ### Step 2 — Iteration loop (i = 1 .. Max iterations)
 
+**Pre-register iteration TodoWrite items** — before entering the loop, create `iteration 1`, `iteration 2`, ..., `iteration <Max iterations>` TodoWrite items. Mark `in_progress` before each dispatch, `completed` after parse+apply (for a `converged` verdict, "apply" is a no-op — mark `completed` immediately after parsing the verdict). On early convergence (verdict `status=converged`) or safety-rail triggered exit (`skipped` / `conflict`), mark remaining iteration items `completed` with note matching the exit reason (e.g. `skipped: converged at iter 2`). The "note" lives in the TodoWrite item's `content` field — append as `— <reason>`; TodoWrite has no dedicated note field. Pre-registration is load-bearing: without it, the subagent-driven loop tends to stop after the first iteration that looks acceptable, even when gaps remain that further iterations could close.
+
 #### (a) Dispatch subagent
 
 Invoke the `Agent` tool with a fresh subagent. Pass:
 
 - `Description` and `Suggested fix direction` (verbatim)
-- The unified diff from Step 1
-- The full current contents of `Target file` (from `Read`)
+- The unified diff (on iter 1, reuse Step 1's output; on iter ≥ 2, re-run `git diff <Base ref> -- <Target file>` so the diff reflects edits that landed in prior iterations)
+- The full current contents of `Target file` — re-`Read` at the start of every iteration so the snapshot reflects prior edits
 - The judgment rubric and response format below
 
 **Judgment rubric (include verbatim in the subagent prompt):**
@@ -73,7 +75,7 @@ Invoke the `Agent` tool with a fresh subagent. Pass:
 1. **Verdict missing or malformed** — no fenced JSON block found, or JSON parse fails → return `status=skipped`, `reason="verdict parse failure"`.
 2. **Schema violation** — `objective_met` is not one of `yes|partial|no`, or required keys are missing → return `status=skipped`, `reason="verdict schema violation"`.
 3. **Divergence** — only when `i >= 2`: if both `remaining_gaps` AND `regressions` contain the same elements as the previous iteration's values (compare as multisets — sort each array textually before comparison so a reordered-but-identical report still counts as divergence), the loop is not making progress → return `status=skipped`, `reason="divergent gaps"`. (Skip on `i = 1`. Comparing the `(remaining_gaps, regressions)` pair catches a subagent that reports regressions-only with empty `suggested_edits`, which would otherwise loop on empty-equal `remaining_gaps` alone.)
-4. **Converged** — `objective_met == "yes"` AND `regressions` is empty → exit loop with `status=converged`.
+4. **Converged** — `objective_met == "yes"` AND `regressions` is empty → exit loop with `status=converged` and proceed directly to Step 4. Safety rails (c) do not run (their "at least one edit was applied" precondition is not met this iteration).
 5. **Otherwise** — apply `suggested_edits` in order:
    - Re-Read the target file before each Edit so `old_string` matches current contents.
    - If an `old_string` is not found, skip that edit and continue with the next. This is expected when the subagent returned multiple edits from a single snapshot and a later edit overlaps a region an earlier edit already rewrote — the skip is a no-op fallback, not an error.
@@ -119,7 +121,8 @@ Field semantics by status:
 - `reason`: JSON `null` for `converged` and `unresolved`; the matching enumerated string otherwise.
 - `objective_met`: the last verdict's value for `converged` (always `"yes"`), `unresolved`, and `skipped (divergent gaps)`. `"unknown"` for all other skipped/conflict paths (verdict was never received, or the verdict itself was unparseable).
 - `unresolved_gaps`: the last verdict's `remaining_gaps` for `unresolved` and `skipped (divergent gaps)`; `[]` otherwise.
-- `iterations_used`: the number of iterations whose subagent dispatch returned a verdict, whether or not edits landed. Step 1 early returns (missing target, empty diff) count as `0`.
+- `applied_edits_count`: count of `suggested_edits` whose `Edit` call succeeded. Edits skipped because their `old_string` did not match do not count. Applies to all statuses.
+- `iterations_used`: the number of iterations whose subagent dispatch returned a verdict, whether or not edits landed — **including the iteration whose verdict triggered `converged`** (which applies no edits itself). Step 1 early returns (missing target, empty diff) count as `0`.
 
 ## Dispatch failure
 
