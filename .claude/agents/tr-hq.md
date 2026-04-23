@@ -1,0 +1,1 @@
+../../plugins/translate/agents/tr-hq.md

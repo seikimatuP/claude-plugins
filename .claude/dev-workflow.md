@@ -9,5 +9,5 @@ hooks:
   on_complete:
     - "Skill(skill-review)"
 self_retrospective:
-  feedback: "./.claude/retrospectives"
+  feedback: "SonicGarden/dev-workflow-issues"
 ---

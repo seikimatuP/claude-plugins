@@ -1,4 +1,4 @@
-.claude/*
-!.claude/commands/
-!.claude/skills/
-!.claude/dev-workflow.md
+# claude-code
+.claude/*.local.*
+.claude/plans/archive/
+.claude/retrospectives/
