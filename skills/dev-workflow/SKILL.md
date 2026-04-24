@@ -188,7 +188,7 @@ After section A or B completes, the "effective task" is set for Step 2 onward: t
    - **Moderate** (multi-file within one module, feature following existing patterns): N = min(2, N)
    - **Complex** (cross-module, new patterns, API changes, significant refactoring): keep N
    File count is a hint, not the sole criterion. If adjusted, mark excess TodoWrite iteration items (Step 3-x and Step 8-x) as `completed`. Log the assessed difficulty and effective N. If the difficulty is **Simple** and the Step 9.5 TodoWrite row exists (i.e. `self_retrospective.feedback` is configured), additionally mark that row as `completed` with note `skipped: Simple task`.
-8. Do not present the plan to the user or ask for approval/confirmation — presenting an unreviewed plan wastes user time and risks approval of a suboptimal approach. Proceed to Step 3. The user will see the reviewed plan in Step 4.
+8. Do not present the plan to the user or ask for approval/confirmation — presenting an unreviewed plan wastes user time and risks approval of a suboptimal approach. This prohibition extends to confirmation-seeking transition sentences such as "if this design looks good, I'll proceed to Step 3 (Plan Review)", "shall I move on to Plan Review?", or any equivalent ask-for-go-ahead phrasing — these read as natural conversation but constitute the same approval-gate that wastes user attention on an unreviewed plan. The moment Step 2 ends, advance directly to Step 3 without emitting any user-facing message about the plan or the transition. The user will see the reviewed plan in Step 4.
 
 ### Step 3: Plan Review
 
