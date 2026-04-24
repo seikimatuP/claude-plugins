@@ -85,7 +85,7 @@ For each accepted Finding:
 - **(a) Re-read target file** — `skills/<target>/<file>`. For the first Finding this is HEAD state; for later same-file Findings it's the prior commit's result. Build `old_string` / `new_string` against this state
 - **(b) Apply Edit** — on failure (typically `old_string` not found because a prior Finding rewrote that region), downgrade to `conflict` and continue
 - **(c) Frontmatter integrity check** — re-read the edited file; the `---` YAML block must still parse. If not: downgrade to `conflict`, run `git checkout HEAD -- <target-file>` to revert (nothing is staged yet), continue
-- **(d) `Skill(verify-diff)` empirical check** (up to 3 iterations) — dispatch a bias-free subagent that reads the Finding's problem description alongside the diff and, if gaps remain, returns `suggested_edits` as JSON; `verify-diff` applies them autonomously and loops until convergence or max-iter. Inputs per Finding:
+- **(d) `Skill(verify-diff)` empirical check** (up to 3 executor dispatches per Finding) — `verify-diff` derives 1–2 evaluation scenarios from the Finding in its main thread, then on each iteration dispatches a fresh bias-free executor that actually runs those scenarios against the post-diff file; if gaps remain the executor returns `suggested_edits` as JSON and `verify-diff` applies them autonomously, looping until convergence or max-iter. Inputs per Finding:
   - `Description` = Finding's `Description` field (verbatim)
   - `Suggested fix direction` = Finding's `Suggested fix direction` field (verbatim)
   - `Target file` = the file edited in (b)
