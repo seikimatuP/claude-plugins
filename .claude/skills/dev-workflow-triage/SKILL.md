@@ -23,7 +23,7 @@ Whole-issue `parse-error` is **not** an abort; the issue is left open with a tri
 
 Concretely, the recognized return points are the (d) `Skill(verify-diff)` empirical check and the (d2) `Skill(skill-review)` polish bullets inside the Apply accepted Findings sub-flow. Both carry a return-point no-stall reminder inline; the duplication with this section is intentional so the rule appears at the decision moment.
 
-**Non-fatal errors are recorded and skipped, not stops.** `comment-failed`, `close-failed`, `commit-failed`, `overflow=true`, and `release-bookkeeping-failed` (Step 3.7 commit error, scope leak, version skew, or json invalid) all continue with the next Finding or issue, or fall through to Step 4 — `references/triage-criteria.md` § Edge-case dispatch table is the authoritative list of dispositions.
+**Non-fatal errors are recorded and skipped, not stops.** Per-Finding errors (`comment-failed`, `close-failed`, `commit-failed`, `overflow=true`) continue with the next Finding or issue. Step 3.7 errors (`release-bookkeeping=failed (commit error|scope leak|version skew|json invalid|changelog edit error)`) fall through to Step 4 — Step 3.7 runs once per run after the per-issue loop, so "next Finding" is not a possible recovery there. `references/triage-criteria.md` § Edge-case dispatch table is the authoritative list of dispositions.
 
 **Fatal tool-level errors are out of scope** — irrecoverable `Edit` / `Read` / `Bash` failures halt with a diagnostic regardless.
 
@@ -108,10 +108,10 @@ Process accepted Findings one at a time in the order they appear. Same-file Find
 - `skill_review`: terminal token from (d2) — `converged-iter-<k>` (where `<k>` is the iteration that returned "No actionable findings", 1–3), `notes-left-after-3`, `error`, `skipped` (when (d2) was bypassed because verify-diff returned `conflict`), or `disabled`
 - `commit`: the commit hash from (g), or `—` when no commit happened
 
-For each accepted Finding:
+For each accepted Finding (the per-Finding memory record described above is updated **at the end of each sub-step that produces its corresponding field** — record-write points are called out inline below):
 
 - **(a) Re-read target file** — `skills/<target>/<file>`. For the first Finding this is HEAD state; for later same-file Findings it's the prior commit's result. Build `old_string` / `new_string` against this state
-- **(b) Apply Edit** — on failure (typically `old_string` not found because a prior Finding rewrote that region), downgrade to `conflict` and continue
+- **(b) Apply Edit** — on failure (typically `old_string` not found because a prior Finding rewrote that region), downgrade to `conflict` and continue. **Record-write**: set `record.target = skills/<target>/<file>` on success; leave as `—` and set `record.disposition = conflict` on failure.
 - **(c) Frontmatter integrity check** — re-read the edited file; the `---` YAML block must still parse. If not: downgrade to `conflict`, run `git checkout HEAD -- <target-file>` to revert (nothing is staged yet), continue
 - **(d) `Skill(verify-diff)` empirical check** (up to 3 executor dispatches per Finding) — `verify-diff` derives 1–2 evaluation scenarios from the Finding in its main thread, then on each iteration dispatches a fresh bias-free executor that actually runs those scenarios against the post-diff file; if gaps remain the executor returns `suggested_edits` as JSON and `verify-diff` applies them autonomously, looping until convergence or max-iter. Inputs per Finding:
   - `Description` = Finding's `Description` field (verbatim)
@@ -120,16 +120,16 @@ For each accepted Finding:
   - `Base ref` = `HEAD`
   - `Max iterations` = `3`
 
-  Parse the fenced JSON block `verify-diff` returns, then branch on `status`:
+  Parse the fenced JSON block `verify-diff` returns, then branch on `status` (every branch sets `record.verify_diff` to the status token and `record.iterations_used` to the JSON's `iterations_used`):
   - `converged` → proceed to (d2)
   - `unresolved` → record warning `verify-diff unresolved (<n> gaps)` (where `n = unresolved_gaps.length`), proceed to (d2)
   - `skipped` → record warning `verify-diff skipped (<reason>)` using `reason` from the summary, proceed to (d2)
-  - `conflict` → downgrade the whole Finding to `conflict`. `verify-diff` has already reverted via `git checkout HEAD -- <reverted_paths>` inside its own safety rails, but re-run `git checkout HEAD -- <reverted_paths>` here as an idempotent safety net. Skip (d2), (f), and (g) — nothing commits for this Finding — then continue to the next Finding
+  - `conflict` → downgrade the whole Finding to `conflict` (also set `record.disposition = conflict`). `verify-diff` has already reverted via `git checkout HEAD -- <reverted_paths>` inside its own safety rails, but re-run `git checkout HEAD -- <reverted_paths>` here as an idempotent safety net. Skip (d2), (f), and (g) — nothing commits for this Finding — then continue to the next Finding
 
   **Return-point no-stall reminder**: when `verify-diff` returns with `converged` / `unresolved` / `skipped` (any non-`conflict` result), this is mid-Finding workflow, never a terminal point. The next action is the (d2) `Skill(skill-review)` polish step — emit it in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
 
   **Consecutive-error disable** (mirrors the `skill-review` consecutive-error handling below): keep a per-run counter. `converged` or `unresolved` → counter reset (the skill is functioning, even if gaps remain). `skipped` or `conflict` → counter increments. When the counter reaches 2, set `verify_diff_disabled=true`; for the remainder of the run, skip the `verify-diff` call on each Finding and record warning `verify-diff disabled after consecutive errors`. Proceed directly to (d2) in that case. The `verify-diff disabled after consecutive errors` warning attaches from the Finding **immediately after** the disable was triggered; the triggering Finding itself only carries its own disposition (conflict, or its own `verify-diff skipped (<reason>)` warning).
-- **(d2) `Skill(skill-review)` polish** (up to 3 iterations) — stop at the first iteration that returns no actionable findings. If any iteration applies edits, re-run (c) frontmatter check, AND re-check that `git diff --name-only` still lists only paths under `skills/` (the full scope check from (f) — run per iteration, not just at the end, so skill-review's sibling-file edits can't silently leak to the next Finding). If scope leaks, treat as (f)'s failure case immediately. After 3 iterations with findings remaining: record `skill-review notes left (<count>)` warning and continue to (f).
+- **(d2) `Skill(skill-review)` polish** (up to 3 iterations) — stop at the first iteration that returns no actionable findings. If any iteration applies edits, re-run (c) frontmatter check, AND re-check that `git diff --name-only` still lists only paths under `skills/` (the full scope check from (f) — run per iteration, not just at the end, so skill-review's sibling-file edits can't silently leak to the next Finding). If scope leaks, treat as (f)'s failure case immediately. After 3 iterations with findings remaining: record `skill-review notes left (<count>)` warning and continue to (f). **Record-write**: set `record.skill_review` per outcome — `converged-iter-<k>` (where `<k>` is the iteration that returned "No actionable findings"), `notes-left-after-3`, or `skipped` if (d2) was bypassed because (d) returned `conflict`.
 
   **Return-point no-stall reminder**: this sub-skill return (regardless of outcome — "No actionable findings", an applied-edits result, or any non-error outcome) is mid-Finding workflow, never a terminal point. The next action is (f) Scope check + stage in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
 - **(e) skill-review error handling** — error response: record `skill-review error (<reason>)` and skip polish for this Finding. After 2 consecutive Findings with skill-review errors: set `skill_review_disabled=true` and skip polish for the rest of the run (warning: `skill-review disabled after consecutive errors`)
@@ -146,7 +146,7 @@ For each accepted Finding:
   )"
   ```
 
-  On zero exit: capture `git rev-parse HEAD` for the summary. On non-zero (typically a pre-commit hook rejection): run `git reset` + `git checkout HEAD -- <paths>` to return to a clean tree, downgrade to `conflict`, record `commit-failed`, continue
+  On zero exit: capture `git rev-parse HEAD` for the summary, and set `record.commit = <hash>` and `record.disposition = accept`. On non-zero (typically a pre-commit hook rejection): run `git reset` + `git checkout HEAD -- <paths>` to return to a clean tree, downgrade to `conflict` (`record.disposition = conflict`, `record.commit = —`), record `commit-failed`, continue
 
 `references/triage-criteria.md` § edge-case dispatch table lists the same dispositions in table form — useful as a quick reference; the procedural prose above is authoritative for ordering.
 
@@ -201,7 +201,14 @@ jq -r '.plugins[] | select(.name | IN("dev-workflow","peer","extract-rules","rul
 
 **(g) Edit `marketplace.json`** for each bump-set plugin, one at a time:
 
-- Use the `Edit` tool. `old_string` must span the plugin name line and the version line as one contiguous block (e.g. `"name": "<plugin>",\n      ...\n      "version": "<old>",`).
+- Use the `Edit` tool. `old_string` must span the plugin name line and the version line as one contiguous block. **The `...` placeholder shown below is shorthand — `Edit` requires a verbatim substring match, so fill the gap with the actual intermediate fields (`description`, `source`, `skills`, `author`, … as they appear in the file)** — read `marketplace.json` first and copy the exact lines. Schematic shape:
+
+  ```text
+  "name": "<plugin>",
+        ... (intermediate fields verbatim from the file) ...
+        "version": "<old>",
+  ```
+
 - **Name prefix-match warning**: `"name": "dev-workflow"` is a substring of `"name": "dev-workflow-bundle"`, so always include the closing `"` and trailing `,` of the `name` field — otherwise Edit halts with a not-unique error.
 - Do **not** use `replace_all` — multiple plugins may share the same version string.
 
@@ -211,10 +218,12 @@ After all Edits land, run `jq empty .claude-plugin/marketplace.json` once. On fa
 
 - Keep the existing first line `# Changelog` intact.
 - Find today's `## YYYY-MM-DD` heading directly under `# Changelog`. If absent, insert a new today's heading immediately after `# Changelog`. If present (a same-day prior triage run wrote it), keep it and prepend new content under it — do not duplicate the heading.
-- Under today's heading, **prepend** one `### <skill> v<new> / dev-workflow-bundle v<new>` subsection per modified bundle skill, ordering newer-version subsections above any older same-day subsections (matches the existing CHANGELOG style: newer versions on top).
+- Under today's heading, **prepend** one `### <skill> v<new> / dev-workflow-bundle v<new>` subsection per modified bundle skill, ordering newer-version subsections above any older same-day subsections (matches the existing CHANGELOG style: newer versions on top). When this run bumps multiple skills, write the per-skill subsections in **alphabetical skill name** order so re-runs are deterministic.
 - Under each `### <skill> v...` subsection, write one bullet per accepted Finding that targeted that skill (in original Finding order):
   - `- fix(<skill>): <Finding 1-line summary> (auto-triage #<issue-N>)`
   - Optionally followed by a nested `  - Category: <category>; <1-line Reason>` line for parity with the existing CHANGELOG body style.
+
+If any Edit in (h) fails partway (e.g. the heading insert succeeded but a subsequent subsection write failed), revert via `git checkout HEAD -- .claude-plugin/marketplace.json CHANGELOG.md`, record `release-bookkeeping=failed (changelog edit error)`, and proceed to Step 4.
 
 **(i) Scope check**: run `git diff --name-only`. The result must list exactly `.claude-plugin/marketplace.json` and `CHANGELOG.md` and nothing else. If anything else appears, revert via `git checkout HEAD -- .claude-plugin/marketplace.json CHANGELOG.md`, record `release-bookkeeping=failed (scope leak)`, and proceed to Step 4. **Per-Finding commits stay in HEAD** through every Step 3.7 failure branch — `git checkout HEAD -- ...` only affects working-tree paths, not committed history.
 
@@ -239,7 +248,7 @@ On zero exit, capture `git rev-parse HEAD` as the bookkeeping commit hash for th
 
 Print to stdout (the only trace a routine leaves). The summary has two sections — first the **Per-Finding execution log**, then the aggregate counters.
 
-**Per-Finding execution log** — one block per processed Finding in source order. Fields source from the per-Finding memory record in § 3.4. `[iter <iterations_used>/3]` always renders (including `disabled`, where `<iterations_used>=0`). For `parse-error` and `reject` dispositions, `target` / `verify-diff` / `skill-review` / `commit` all render as `—`.
+**Per-Finding execution log** — one block per processed Finding in source order. Fields source from the per-Finding memory record in § 3.4. `[iter <iterations_used>/3]` renders the iteration count for `converged` / `unresolved` / `skipped` / `conflict`; for `disabled`, render `[iter —]` (no integer). For `parse-error` and `reject` dispositions, `target` / `verify-diff` / `skill-review` / `commit` all render as `—`.
 
 ```text
 issue #<N> Finding <n>: <accept|reject|conflict|parse-error>
@@ -259,6 +268,6 @@ issue #<N> Finding <n>: <accept|reject|conflict|parse-error>
 - skill-review state: `enabled` or `disabled-after-errors`; count of Findings with `skill-review notes left`
 - Failure counts: `comment-failed` / `close-failed` / `commit-failed`, with (issue#, finding#) pairs
 - `overflow=true` notice if Step 2 hit the 200-issue cap
-- `release-bookkeeping`: one of `<commit-hash>` (success), `skipped (no commits)`, `failed (version skew: dev-workflow=<v1>, dev-workflow-bundle=<v2>)`, `failed (scope leak)`, or `failed (commit error)` — sourced from Step 3.7's outcome
+- `release-bookkeeping`: one of `<commit-hash>` (success), `skipped (no commits)`, `failed (version skew: dev-workflow=<v1>, dev-workflow-bundle=<v2>)`, `failed (json invalid)`, `failed (changelog edit error)`, `failed (scope leak)`, or `failed (commit error)` — sourced from Step 3.7's outcome
 
 Always emit the summary, even on zero-activity runs — "ran but made no changes" must be distinguishable from "didn't run at all".

@@ -53,6 +53,7 @@ Quick reference for per-case dispositions. SKILL.md's procedural prose is author
 | Step 3.7 reaches release bookkeeping with zero accepted-and-committed Findings across the run | Skip release bookkeeping; record `release-bookkeeping=skipped (no commits)`; per-Finding commits (none in this case) and Step 4 summary proceed |
 | Step 3.7 version-skew guard: pre-bump versions of `dev-workflow` plugin and `dev-workflow-bundle` plugin disagree | Abort release bookkeeping with no marketplace / CHANGELOG edits; record `release-bookkeeping=failed (version skew: dev-workflow=<v1>, dev-workflow-bundle=<v2>)` |
 | Step 3.7 post-Edit `jq empty .claude-plugin/marketplace.json` returns non-zero | Revert via `git checkout HEAD -- .claude-plugin/marketplace.json`; record `release-bookkeeping=failed (json invalid)` |
+| Step 3.7 (h) CHANGELOG.md Edit fails partway (heading inserted but later subsection edit failed, etc.) | Revert via `git checkout HEAD -- .claude-plugin/marketplace.json CHANGELOG.md`; record `release-bookkeeping=failed (changelog edit error)` |
 | Step 3.7 `git diff --name-only` after Edits lists a path other than `.claude-plugin/marketplace.json` / `CHANGELOG.md`, OR the bookkeeping `git commit` returns non-zero | Revert via `git checkout HEAD -- .claude-plugin/marketplace.json CHANGELOG.md` (and `git reset` for the commit-error branch); record `release-bookkeeping=failed (<scope leak\|commit error>)` |
 
 ## Comment body template
