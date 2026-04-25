@@ -56,3 +56,16 @@
 - PreCompactだけでなくStopフックも検討（Compactが発生しない場合に対応）
 - 設定が複雑なスキルには README.md を用意する。`skills/<name>/README.md` に置けば direct-skill 方式で source 直下に配置されるため、利用者に自動的に届く
 - プラグイン構造を変更する場合、`.claude-plugin/marketplace.json` だけでなく検証ツール（`.claude/skills/run-tests/SKILL.md`、`.claude/commands/verify-plugins.md`）とドキュメント（`CLAUDE.md`）の該当箇所もセットで更新する。片方だけ更新すると見落としが発生する
+
+## バージョン管理 / リリース運用
+
+- bundle に含まれるスキル（`dev-workflow` / `ask-peer` / `extract-rules` / `rules-review`）の version bump は、対応するスキル plugin と `dev-workflow-bundle` plugin を **常にペアで bump** する。CHANGELOG の version subsection 見出しも `### <skill> vX.Y.Z / dev-workflow-bundle vX.Y.Z` の対形式で書く（既存 CHANGELOG の不変条件）
+- bump 直前に `dev-workflow` plugin と `dev-workflow-bundle` plugin の現 version 一致を `jq -r ...` で確認する version-skew guard を入れる。不一致なら abort して per-Finding コミットは preserve する
+- `marketplace.json` の version 書き換えは `jq | mv` ではなく `Edit` ツールで version 行を直接書き換える。`Bash(mv *)` を allowed-tools に追加せずに済むため、「allowed-tools は必要最小限」原則と整合する。Edit 直後に `jq empty` で構文整合性を再確認する
+- `Edit` で plugin の version を書き換えるときの `old_string` には plugin name + 周辺 + version を含める塊を取り、name の閉じる double-quote と末尾 `,` まで必ず含める（例: `"name": "dev-workflow",`）。`"name": "dev-workflow"` のように trailing カンマを含めないと `"name": "dev-workflow-bundle"` の prefix と被って not-unique error になる。`replace_all` は禁止
+- 自動化スクリプトやルーチンスキルでスキルを更新した場合、CHANGELOG.md / marketplace.json の version bump は **per-Finding コミットとは別の bookkeeping commit** にまとめる（`chore(release): bump <plugins> (auto-triage YYYY-MM-DD)` のような subject）。「1 accepted Finding = 1 commit」ルールを維持し、scope check の意味を保つため
+- CHANGELOG.md のエントリは新しい version subsection を `## YYYY-MM-DD` 直下に **prepend** する（既存スタイル「新しい version が上」と整合）。同日複数 invocation が起きうる場合、commit subject 末尾に `(auto-triage YYYY-MM-DD)` 等のサフィックスを付けて commit log で区別できるようにする
+
+## Examples
+
+When in doubt: ./project.rules.examples.md
