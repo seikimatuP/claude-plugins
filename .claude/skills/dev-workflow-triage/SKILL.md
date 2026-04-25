@@ -21,6 +21,8 @@ Whole-issue `parse-error` is **not** an abort; the issue is left open with a tri
 
 **No pause at sub-skill returns.** When `Skill(verify-diff)` or `Skill(skill-review)` returns, parse the result and follow the existing branch logic immediately. Long reasoning prose in the response is not a stopping signal — do not insert a "let me summarize what just happened" turn before the next action.
 
+Concretely, the recognized return points are the (d) `Skill(verify-diff)` empirical check and the (d2) `Skill(skill-review)` polish bullets inside the Apply accepted Findings sub-flow. Both carry a return-point no-stall reminder inline; the duplication with this section is intentional so the rule appears at the decision moment.
+
 **Non-fatal errors are recorded and skipped, not stops.** `comment-failed`, `close-failed`, `commit-failed`, and `overflow=true` all continue with the next Finding or issue — `references/triage-criteria.md` § Edge-case dispatch table is the authoritative list of dispositions.
 
 **Fatal tool-level errors are out of scope** — irrecoverable `Edit` / `Read` / `Bash` failures halt with a diagnostic regardless.
@@ -116,8 +118,12 @@ For each accepted Finding:
   - `skipped` → record warning `verify-diff skipped (<reason>)` using `reason` from the summary, proceed to (d2)
   - `conflict` → downgrade the whole Finding to `conflict`. `verify-diff` has already reverted via `git checkout HEAD -- <reverted_paths>` inside its own safety rails, but re-run `git checkout HEAD -- <reverted_paths>` here as an idempotent safety net. Skip (d2), (f), and (g) — nothing commits for this Finding — then continue to the next Finding
 
+  **Return-point no-stall reminder**: when `verify-diff` returns with `converged` / `unresolved` / `skipped` (any non-`conflict` result), this is mid-Finding workflow, never a terminal point. The next action is the (d2) `Skill(skill-review)` polish step — emit it in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
+
   **Consecutive-error disable** (mirrors the `skill-review` consecutive-error handling below): keep a per-run counter. `converged` or `unresolved` → counter reset (the skill is functioning, even if gaps remain). `skipped` or `conflict` → counter increments. When the counter reaches 2, set `verify_diff_disabled=true`; for the remainder of the run, skip the `verify-diff` call on each Finding and record warning `verify-diff disabled after consecutive errors`. Proceed directly to (d2) in that case. The `verify-diff disabled after consecutive errors` warning attaches from the Finding **immediately after** the disable was triggered; the triggering Finding itself only carries its own disposition (conflict, or its own `verify-diff skipped (<reason>)` warning).
-- **(d2) `Skill(skill-review)` polish** (up to 3 iterations) — stop at the first iteration that returns no actionable findings. If any iteration applies edits, re-run (c) frontmatter check, AND re-check that `git diff --name-only` still lists only paths under `skills/` (the full scope check from (f) — run per iteration, not just at the end, so skill-review's sibling-file edits can't silently leak to the next Finding). If scope leaks, treat as (f)'s failure case immediately. After 3 iterations with findings remaining: record `skill-review notes left (<count>)` warning and continue to (f)
+- **(d2) `Skill(skill-review)` polish** (up to 3 iterations) — stop at the first iteration that returns no actionable findings. If any iteration applies edits, re-run (c) frontmatter check, AND re-check that `git diff --name-only` still lists only paths under `skills/` (the full scope check from (f) — run per iteration, not just at the end, so skill-review's sibling-file edits can't silently leak to the next Finding). If scope leaks, treat as (f)'s failure case immediately. After 3 iterations with findings remaining: record `skill-review notes left (<count>)` warning and continue to (f).
+
+  **Return-point no-stall reminder**: this sub-skill return (regardless of outcome — "No actionable findings", an applied-edits result, or any non-error outcome) is mid-Finding workflow, never a terminal point. The next action is (f) Scope check + stage in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
 - **(e) skill-review error handling** — error response: record `skill-review error (<reason>)` and skip polish for this Finding. After 2 consecutive Findings with skill-review errors: set `skill_review_disabled=true` and skip polish for the rest of the run (warning: `skill-review disabled after consecutive errors`)
 - **(f) Scope check + stage** — `git diff --name-only` must show paths only under `skills/`. Any path outside: downgrade to `conflict`, `git checkout HEAD -- <paths>`, continue. Otherwise `git add <paths>` with explicit paths
 - **(g) Commit** — use a HEREDOC with sentinel `COMMIT_MSG_END` (not `EOF`, to avoid early termination if Finding text contains an `EOF` line):
@@ -141,7 +147,7 @@ For each accepted Finding:
 After every Finding in the issue is classified (or immediately, if the whole issue was classified as `parse-error` by Parse body):
 
 - Build the body using the template in `references/triage-criteria.md`
-- `mkdir -p .claude/plans`, then `Write` to `.claude/plans/triage-<YYYY-MM-DD>-issue<N>.md`. On collision (re-run), append `-2`, `-3`, .... The file is gitignored and kept as a local in-session reference (the GitHub comment is canonical); do not delete it
+- `mkdir -p .triage`, then `Write` to `.triage/triage-<YYYY-MM-DD>-issue<N>.md`. On collision (re-run), append `-2`, `-3`, .... The file is gitignored and kept as a local in-session reference (the GitHub comment is canonical); do not delete it. The directory is intentionally placed outside `.claude/` so Claude Code's sensitive-path treatment for `.claude/*` paths does not trigger a Write permission prompt during routine execution
 - Run `gh issue comment <N> --repo SonicGarden/dev-workflow-issues --body-file <path>`
 - Non-zero exit: record `comment-failed`, continue with other issues
 
