@@ -100,14 +100,14 @@ Process accepted Findings one at a time in the order they appear. Same-file Find
 
 **Register per-Finding iteration TodoWrite items** — before processing each accepted Finding, create these items: `(d) verify-diff call`, `(d2) skill-review iter 1`, `(d2) skill-review iter 2`, `(d2) skill-review iter 3`. Mark `in_progress` before each iteration, `completed` after. On early convergence (skill-review returns no findings) or disable, mark remaining iteration items `completed` and append the reason directly to the item's `content` field as `— skipped: converged` or `— skipped: disabled` (TodoWrite has no dedicated note field). Steps (a)–(c), (f), (g) are deliberately not pre-registered — only the iteration loop is, because it is the loop that tends to exit early on the first "good enough" iteration when unmarked.
 
-**Per-Finding record kept in memory for the Step 4 execution log** — alongside the existing decision + reasoning store from § 3.3, also keep a small structured record per processed Finding so Step 4's Per-Finding execution log can render it. **TodoWrite is the progress UI, not a record source — it cannot be read back at runtime, so anything Step 4 needs has to be held in memory here.** The record fields:
+**Per-Finding record kept in memory for the Step 4 execution log** — alongside the existing decision + reasoning store from § Judge each Finding, also keep a small structured record per processed Finding so Step 4's Per-Finding execution log can render it. **TodoWrite is the progress UI, not a record source — it cannot be read back at runtime, so anything Step 4 needs has to be held in memory here.** **All fields are initialized to defaults on entry to (a)** so any sub-step that aborts early (e.g. (b)-Edit failure → `conflict` before (d) runs) leaves explicit defaults rather than undefined values. Defaults and update points:
 
-- `disposition`: `accept` / `reject` / `conflict` / `parse-error`. **Initialized to `accept` on entry to (a)** so any downgrade path that fires in (b)/(c)/(d)/(f)/(g) simply overwrites it, and a missed downgrade can never leave the field undefined.
-- `target`: the edit target path from (b), or `—` when no edit was attempted
-- `verify_diff`: status token from (d) — `converged` / `unresolved` / `skipped` / `conflict` / `disabled`
-- `iterations_used`: integer from `verify-diff`'s JSON verdict (set to `0` when the call was skipped because `verify_diff_disabled=true`)
-- `skill_review`: terminal token from (d2) — `converged-iter-<k>` (where `<k>` is the iteration that returned "No actionable findings", 1–3), `notes-left-after-3`, `error`, `skipped` (when (d2) was bypassed because verify-diff returned `conflict`), or `disabled`
-- `commit`: the commit hash from (g), or `—` when no commit happened
+- `disposition`: default `accept`. Downgrade paths in (b)/(c)/(d)/(f)/(g) overwrite it to `conflict`. Final values: `accept` / `reject` / `conflict` / `parse-error`.
+- `target`: default `—`. Set to the edit target path on (b) success.
+- `verify_diff`: default `—`. Set to status token from (d) — `converged` / `unresolved` / `skipped` / `conflict` / `disabled`.
+- `iterations_used`: default `—`. Set to integer from `verify-diff`'s JSON verdict (or `0` when the call was skipped because `verify_diff_disabled=true`).
+- `skill_review`: default `—`. Set to terminal token from (d2) — `converged-iter-<k>` (where `<k>` is the iteration that returned "No actionable findings", 1–3), `notes-left-after-3`, `error`, `skipped` (when (d2) was bypassed because verify-diff returned `conflict`), or `disabled`.
+- `commit`: default `—`. Set to the commit hash on (g) zero-exit.
 
 For each accepted Finding (the per-Finding memory record described above is updated **at the end of each sub-step that produces its corresponding field** — record-write points are called out inline below):
 
@@ -190,13 +190,13 @@ The accepted-and-committed list, every per-Finding commit hash, and every (targe
 
 **(d) Bump set**: take the plugin names from (c) and always add `dev-workflow-bundle` to the set. **Skill bump and bundle bump are always paired.** The CHANGELOG subsection header is always rendered as `### <skill> v<new> / dev-workflow-bundle v<new>` — bundle-only subsections are never written.
 
-**(e) Read versions and check skew**: in a single `jq` invocation, read the `version` of every plugin in the bump set plus `dev-workflow-bundle`:
+**(e) Read versions and check skew**: in a single `jq` invocation, read the `version` of every plugin in the bump set plus the always-included pair `dev-workflow` and `dev-workflow-bundle` (always included so the skew check can run even when `dev-workflow` itself wasn't modified this run — e.g. an `ask-peer`-only run still needs to compare `dev-workflow` against `dev-workflow-bundle`):
 
 ```bash
 jq -r '.plugins[] | select(.name | IN("dev-workflow","peer","extract-rules","rules-review","dev-workflow-bundle")) | "\(.name)=\(.version)"' .claude-plugin/marketplace.json
 ```
 
-(Filter the `IN(...)` list to just the plugin names actually in the bump set plus `dev-workflow-bundle` — no need to read versions you won't bump.) If the parsed `dev-workflow` and `dev-workflow-bundle` versions disagree, abort: record `release-bookkeeping=failed (version skew: dev-workflow=<v1>, dev-workflow-bundle=<v2>)` and proceed to Step 4 (per-Finding commits stay in HEAD).
+(Filter the `IN(...)` list to just the plugin names in the bump set plus the always-included pair `dev-workflow` and `dev-workflow-bundle` — no need to read versions you won't bump or use for skew check.) If the parsed `dev-workflow` and `dev-workflow-bundle` versions disagree, abort: record `release-bookkeeping=failed (version skew: dev-workflow=<v1>, dev-workflow-bundle=<v2>)` and proceed to Step 4 (per-Finding commits stay in HEAD).
 
 **(f) Patch bump computation**: from the parsed versions, increment the third semver component of each bump-set plugin by 1 (e.g. `1.34.2` → `1.34.3`). `major.minor` are never changed.
 
@@ -249,13 +249,17 @@ On zero exit, capture `git rev-parse HEAD` as the bookkeeping commit hash for th
 
 Print to stdout (the only trace a routine leaves). The summary has two sections — first the **Per-Finding execution log**, then the aggregate counters.
 
-**Per-Finding execution log** — one block per processed Finding in source order. Fields source from the per-Finding memory record in § 3.4. `[iter <iterations_used>/3]` renders the iteration count for `converged` / `unresolved` / `skipped` / `conflict`; for `disabled`, render `[iter —]` (no integer). For `parse-error` and `reject` dispositions, `target` / `verify-diff` / `skill-review` / `commit` all render as `—`.
+**Per-Finding execution log** — one block per processed Finding in source order. Fields source from the per-Finding memory record in § Apply accepted Findings. **Each field renders its written value, or `—` if the record-write point was never reached** — this rule applies uniformly across all dispositions (`accept` / `reject` / `conflict` / `parse-error`), driven by which sub-steps actually ran for that Finding, not by the disposition itself. The `verify-diff` line carries an `[iter ...]` clause that follows these cases:
+
+- `verify_diff` ∈ {`converged`, `unresolved`, `skipped`, `conflict`} (the (d) sub-step ran): render `<token> [iter <iterations_used>/3]`
+- `verify_diff` = `disabled` (the (d) sub-step was skipped because `verify_diff_disabled=true`): render `disabled [iter —]`
+- `verify_diff` = `—` (the (d) sub-step never ran for this Finding — e.g. (b)/(c) downgraded to `conflict` first, or the disposition is `parse-error`/`reject`): render just `—` with no `[iter ...]` clause
 
 ```text
 issue #<N> Finding <n>: <accept|reject|conflict|parse-error>
   target:        skills/<target>/<file> | —
-  verify-diff:   <converged|unresolved|skipped|conflict|disabled> [iter <iterations_used>/3]
-  skill-review:  <converged-iter-<k>|notes-left-after-3|error|skipped|disabled>
+  verify-diff:   <converged|unresolved|skipped|conflict> [iter <iterations_used>/3] | disabled [iter —] | —
+  skill-review:  <converged-iter-<k>|notes-left-after-3|error|skipped|disabled> | —
   commit:        <hash> | —
 ```
 
