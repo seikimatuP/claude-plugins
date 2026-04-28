@@ -10,7 +10,7 @@ Non-interactive daily triage of the `dev-workflow-bundle` retrospective issues. 
 
 ## No-Stall Principle
 
-This skill has **no user-confirmation gates**. The run executes to completion or aborts to the Step 4 summary. Every other transition — sub-skill returns, loop boundaries, non-fatal error records — continues without user confirmation; the only stopping points are the two exits listed below.
+This skill has **no user-confirmation gates**. The run executes to completion or aborts to the Step 4 summary. Every other transition — sub-skill returns, loop boundaries, non-fatal error records, **TodoWrite phase / per-issue status flips** — continues without user confirmation; the only stopping points are the two exits listed below.
 
 **Permissible fatal-abort exits (both emit the Step 4 summary and stop without entering the per-issue loop):**
 
@@ -21,7 +21,11 @@ Whole-issue `parse-error` is **not** an abort; the issue is left open with a tri
 
 **No pause at sub-skill returns.** When `Skill(verify-diff)` or `Skill(skill-review)` returns, parse the result and follow the existing branch logic immediately. Long reasoning prose in the response is not a stopping signal — do not insert a "let me summarize what just happened" turn before the next action.
 
-Concretely, the recognized return points are the (d) `Skill(verify-diff)` empirical check and the (d2) `Skill(skill-review)` polish bullets inside the Apply accepted Findings sub-flow. Both carry a return-point no-stall reminder inline; the duplication with this section is intentional so the rule appears at the decision moment.
+Concretely, the recognized return points are the (d) `Skill(verify-diff)` empirical check and the (d2) `Skill(skill-review)` polish bullets inside the Apply accepted Findings sub-flow. Both carry a return-point no-stall reminder inline; the duplication with this section is intentional so the rule appears at the decision moment. The (d)/(d2) reminders are scoped to **mid-Finding workflow** AND **mid-issue workflow** — i.e. they cover both same-Finding sub-step transitions (e.g. (d) → (d2) → (f) → (g)) and same-issue sub-step transitions (e.g. 3.4 → 3.5 → 3.6) so no separate inline reminder is needed at 3.4 → 3.5 or 3.5 → 3.6.
+
+**No pause at issue-loop / Step boundaries.** Three additional return-point reminders cover the boundaries the (d)/(d2) reminders do not reach: the **issue boundary** (3.6 → next issue), the **last-issue → Step 3.7 boundary**, and the **Step 3.7 → Step 4 boundary**. Each boundary has its own inline reminder — same closed-list shape as (d)/(d2), placed at the decision moment.
+
+**Phase / per-issue TodoWrite transitions are non-stalling.** Marking a phase row or per-issue row `completed` and the next row `in_progress` must happen as part of the same tool-call burst that produces the next concrete action — never as a standalone summary turn. The `TodoWrite` write itself is allowed (it's a status-only side effect, not a sensitive-path file write, so no permission dialog fires in routine execution), but no user-facing prose is emitted between the status flip and the next non-`TodoWrite` tool call.
 
 **Non-fatal errors are recorded and skipped, not stops.** Per-Finding / per-issue errors (`comment-failed`, `close-failed`, `commit-failed`) continue with the next Finding or issue. Step 2 records `overflow=true` and the run keeps going on the truncated list. Step 3.7 errors (`release-bookkeeping=failed (commit error|scope leak|version skew|json invalid|changelog edit error)`) fall through to Step 4 — Step 3.7 runs once per run after the per-issue loop, so "next Finding" is not a possible recovery there. `references/triage-criteria.md` § Edge-case dispatch table is the authoritative list of dispositions.
 
@@ -60,20 +64,41 @@ fix(<target-skill>): <Finding 1-line summary> (auto-triage #<issue-N>)
 - Run `git diff --quiet` and `git diff --cached --quiet`. Either non-zero ⇒ abort with "working tree is dirty — uncommitted WIP detected" (prevents folding user WIP into a triage commit)
 - Run `git config --get user.email` and `git config --get user.name`. Either empty ⇒ abort with "git identity not configured" (fresh CI / routine containers often lack this)
 
+After all pre-flight checks pass, register the **Workflow Phase Rows** in `TodoWrite` as a single call:
+
+| `content` | `activeForm` | `status` |
+|---|---|---|
+| `Step 1: Pre-flight` | `Running pre-flight checks` | `completed` |
+| `Step 2: List open issues` | `Listing open issues` | `in_progress` |
+| `Step 3: Process each issue serially` | `Processing issues` | `pending` |
+| `Step 3.7: Release bookkeeping` | `Running release bookkeeping` | `pending` |
+| `Step 4: Emit summary` | `Emitting summary` | `pending` |
+
+`Step 1: Pre-flight` is registered already-`completed` so the Step 4 audit trail can show "pre-flight passed". After this `TodoWrite` call, proceed directly to Step 2 in the same tool-call burst — the next tool call must be the `gh issue list` invocation, not a summary turn. See `§ No-Stall Principle` § Phase / per-issue TodoWrite transitions.
+
 ### Step 2 — List open issues
 
-- Run `gh issue list --repo SonicGarden/dev-workflow-issues --state open --limit 200 --json number,title,body`. Use `jq` to extract fields when convenient (e.g. `... | jq -c '.[]'` to stream one issue per line, or `... | jq -r '.[].number'` to pull just numbers)
+- Run `gh issue list --repo SonicGarden/dev-workflow-issues --state open --limit 50 --json number,title,body`. Use `jq` to extract fields when convenient (e.g. `... | jq -c '.[]'` to stream one issue per line, or `... | jq -r '.[].number'` to pull just numbers). The 50-issue cap is intentional — running the full per-Finding sub-flow (verify-diff + skill-review subagent dispatches) on hundreds of issues per routine invocation is impractical; subsequent routine runs progressively drain the rest of the queue
 - Non-zero exit ⇒ fatal abort with summary "gh issue list failed" (covers auth revoked / network failure mid-run — pre-flight only proves auth at start of run, not for the duration)
-- Empty ⇒ emit summary "no open issues" and exit
-- Exactly 200 ⇒ set `overflow=true` (surface in summary as "200-issue cap reached" — `gh issue list` truncates and doesn't return a total, so `== limit` is the overflow signal)
+- Empty (`0` issues) ⇒ in **a single `TodoWrite` call**, flip `Step 2: List open issues` → `completed`, `Step 3: Process each issue serially` → `completed` (no work to do), `Step 3.7: Release bookkeeping` → `completed` (the "skipped (no commits)" branch is reached by definition with zero issues), and `Step 4: Emit summary` → `in_progress`; then proceed directly to summary emission in the next tool-call burst (issuing three separate `TodoWrite` calls would create pause-window between them, which violates `§ No-Stall Principle`). Summary text begins with "no open issues"
+- `1 ≤ N ≤ 49` ⇒ append `N` per-issue rows to `TodoWrite`, **inserted directly after the `Step 3: Process each issue serially` row** (so the per-issue rows render between Step 3 and Step 3.7), then flip `Step 2: List open issues` → `completed` and `Step 3: Process each issue serially` → `in_progress` in the same `TodoWrite` call. Each per-issue row uses `content: "Issue #<N>: <title-snippet>"` and `activeForm: "Processing issue #<N>"` (truncate `<title-snippet>` to a reasonable length if the title is long; informational only). All per-issue rows start with `status: pending`. Proceed directly to the per-issue loop (Step 3) in the next tool-call burst
+- Exactly `50` ⇒ same per-issue append + status flip as above, plus set `overflow=true` (surface in summary as "50-issue cap reached" — `gh issue list` truncates and doesn't return a total, so `== limit` is the overflow signal)
 
 ### Step 3 — Process each issue serially
 
 Do **not** parallelize. Same-skill edits race; `gh issue comment` is non-idempotent.
 
+If Step 2 reported `0` open issues, this whole prelude (and the per-issue sub-steps that follow) is skipped — the 0-issues bullet in `§ List open issues` already flipped Step 3 / Step 3.7 / Step 4 phase rows in one `TodoWrite` call and proceeds directly to summary emission.
+
+Otherwise, for each issue (in source order from Step 2's listing): the per-issue `TodoWrite` row registered in Step 2 is flipped to `in_progress` in the same tool-call burst as the next concrete action (typically the body parse or the first `Read`); the row is flipped to `completed` at the end of `§ Close decision` (or earlier — see `§ Title match` for the title-mismatch skip path). Three completion paths exist:
+
+- **Normal path** (3.1 title match → 3.2 parse OK → 3.3–3.4 → 3.5 → 3.6): per-issue row flips to `completed` immediately after Step 3.6's Close decision settles (zero/non-zero exit alike — `close-failed` does not block the row flip)
+- **Whole-issue parse-error path** (3.1 → 3.2 parse-error → 3.4 skipped → 3.5 → 3.6 close-call skipped, reminder dispatch fires): per-issue row flips to `completed` immediately after Step 3.5 finishes posting the triage comment. Step 3.6 skips the close call by definition for `parse-error`, but the reminder dispatch at the bottom of `§ Close decision` still applies — that dispatch is the path's terminal action, not 3.5
+- **Title-mismatch skip path** (3.1 mismatch → no comment, no close): per-issue row flips to `completed` at the moment of the mismatch decision (skipped → still "processed" in terms of the audit log). The flip is idempotent — when this is a non-first issue, the prior issue's `§ Close decision` reminder #1 has already moved this row from `pending` to `in_progress`, so the §3.1 flip simply settles it to `completed`. When this is the very first issue (so reminder #1 has never fired), the row goes `pending → completed` directly
+
 #### 3.1 Title match
 
-If the title doesn't match `^\[auto-retrospective\] dev-workflow-bundle: \d+ findings`, skip the issue (no comment, no close).
+If the title doesn't match `^\[auto-retrospective\] dev-workflow-bundle: \d+ findings`, skip the issue (no comment, no close). The per-issue row is flipped to `completed` here per `§ Process each issue serially` § Title-mismatch skip path (the flip is idempotent — current status is `in_progress` for non-first issues because the prior issue's reminder #1 already moved this row, and `pending` only for the very first issue). Skipping does not bypass the reminder dispatch — apply the dispatch at the end of `§ Close decision` (reminder #1 if more issues remain, reminder #2 if this was the last one) before advancing.
 
 #### 3.2 Parse body
 
@@ -98,7 +123,7 @@ For each Finding, read `skills/<target>/SKILL.md` first; additionally read `skil
 
 Process accepted Findings one at a time in the order they appear. Same-file Findings work sequentially — each re-reads the target file so its Edit matches the current (post-previous-commit) state.
 
-**Register per-Finding iteration TodoWrite items** — before processing each accepted Finding, create these items: `(d) verify-diff call`, `(d2) skill-review iter 1`, `(d2) skill-review iter 2`, `(d2) skill-review iter 3`. Mark `in_progress` before each iteration, `completed` after. On early convergence (skill-review returns no findings) or disable, mark remaining iteration items `completed` and append the reason directly to the item's `content` field as `— skipped: converged` or `— skipped: disabled` (TodoWrite has no dedicated note field). Steps (a)–(c), (f), (g) are deliberately not pre-registered — only the iteration loop is, because it is the loop that tends to exit early on the first "good enough" iteration when unmarked.
+**Register per-Finding iteration TodoWrite items** — at sub-step (a) entry for each accepted Finding (i.e. immediately before the `(a) Re-read target file` Read), create these items: `(d) verify-diff call`, `(d2) skill-review iter 1`, `(d2) skill-review iter 2`, `(d2) skill-review iter 3`. Mark `in_progress` before each iteration, `completed` after. On early convergence (skill-review returns no findings) or disable, mark remaining iteration items `completed` and append the reason directly to the item's `content` field as `— skipped: converged` or `— skipped: disabled` (TodoWrite has no dedicated note field). Steps (a)–(c), (f), (g) are deliberately not pre-registered — only the iteration loop is, because it is the loop that tends to exit early on the first "good enough" iteration when unmarked.
 
 **Per-Finding record kept in memory for the Step 4 execution log** — alongside the existing decision + reasoning store from § Judge each Finding, also keep a small structured record per processed Finding so Step 4's Per-Finding execution log can render it. **TodoWrite is the progress UI, not a record source — it cannot be read back at runtime, so anything Step 4 needs has to be held in memory here.** **All fields are initialized to defaults on entry to (a)** so any sub-step that aborts early (e.g. (b)-Edit failure → `conflict` before (d) runs) leaves explicit defaults rather than undefined values. Defaults and update points:
 
@@ -127,12 +152,12 @@ For each accepted Finding (the per-Finding memory record described above is upda
   - `skipped` → record warning `verify-diff skipped (<reason>)` using `reason` from the summary, proceed to (d2)
   - `conflict` → downgrade the whole Finding to `conflict` (also set `record.disposition = conflict`). `verify-diff` has already reverted via `git checkout HEAD -- <reverted_paths>` inside its own safety rails, but re-run `git checkout HEAD -- <reverted_paths>` here as an idempotent safety net. Skip (d2), (f), and (g) — nothing commits for this Finding — then continue to the next Finding
 
-  **Return-point no-stall reminder**: when `verify-diff` returns with `converged` / `unresolved` / `skipped` (any non-`conflict` result), this is mid-Finding workflow, never a terminal point. The next action is the (d2) `Skill(skill-review)` polish step — emit it in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
+  **Return-point no-stall reminder**: when `verify-diff` returns with `converged` / `unresolved` / `skipped` (any non-`conflict` result), this is mid-Finding workflow AND mid-issue workflow, never a terminal point. The next action is the (d2) `Skill(skill-review)` polish step — emit it in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
 
   **Consecutive-error disable** (mirrors the `skill-review` consecutive-error handling below): keep a per-run counter. `converged` or `unresolved` → counter reset (the skill is functioning, even if gaps remain). `skipped` or `conflict` → counter increments. When the counter reaches 2, set `verify_diff_disabled=true`; for the remainder of the run, skip the `verify-diff` call on each Finding and record warning `verify-diff disabled after consecutive errors`. Proceed directly to (d2) in that case. The `verify-diff disabled after consecutive errors` warning attaches from the Finding **immediately after** the disable was triggered; the triggering Finding itself only carries its own disposition (conflict, or its own `verify-diff skipped (<reason>)` warning).
 - **(d2) `Skill(skill-review)` polish** (up to 3 iterations) — stop at the first iteration that returns no actionable findings. If any iteration applies edits, re-run (c) frontmatter check, AND re-check that `git diff --name-only` still lists only paths under `skills/` (the full scope check from (f) — run per iteration, not just at the end, so skill-review's sibling-file edits can't silently leak to the next Finding). If scope leaks, treat as (f)'s failure case immediately. After 3 iterations with findings remaining: record `skill-review notes left (<count>)` warning and continue to (f). **Record-write**: set `record.skill_review` per outcome — `converged-iter-<k>` (where `<k>` is the iteration that returned "No actionable findings"), `notes-left-after-3`, or `skipped` if (d2) was bypassed because (d) returned `conflict`.
 
-  **Return-point no-stall reminder**: this sub-skill return (regardless of outcome — "No actionable findings", an applied-edits result, or any non-error outcome) is mid-Finding workflow, never a terminal point. The next action is (f) Scope check + stage in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
+  **Return-point no-stall reminder**: this sub-skill return (regardless of outcome — "No actionable findings", an applied-edits result, or any non-error outcome) is mid-Finding workflow AND mid-issue workflow, never a terminal point. The next action is (f) Scope check + stage in the **next tool call**, not after an interstitial summary or acknowledgment turn. See `§ No-Stall Principle`.
 - **(e) skill-review error handling** — error response: record `skill-review error (<reason>)` and skip polish for this Finding. After 2 consecutive Findings with skill-review errors: set `skill_review_disabled=true` and skip polish for the rest of the run (warning: `skill-review disabled after consecutive errors`)
 - **(f) Scope check + stage** — `git diff --name-only` must show paths only under `skills/`. Any path outside: downgrade to `conflict`, `git checkout HEAD -- <paths>`, continue. Otherwise `git add <paths>` with explicit paths
 - **(g) Commit** — use a HEREDOC with sentinel `COMMIT_MSG_END` (not `EOF`, to avoid early termination if Finding text contains an `EOF` line):
@@ -167,13 +192,25 @@ Close the issue only if every Finding is `accept` or `reject` (no `parse-error`,
 - When closing: `gh issue close <N> --repo ...` with `--reason completed` (any accepts) or `--reason "not planned"` (all rejects). Drop `--reason` if `no_reason_flag=true` (gh < 2.28)
 - Non-zero exit: record `close-failed`, continue
 
+After the per-issue row reaches its terminal sub-step (`§ Close decision` for the normal and parse-error paths; the title-mismatch decision in `§ Title match` for the skip path), apply **exactly one** of the two return-point reminders below — reminder #1 if more unprocessed issues remain in the per-issue queue, reminder #2 if this was the last issue.
+
+**If more unprocessed issues remain in the per-issue queue (apply reminder #1):**
+
+> **Return-point no-stall reminder**: Closing this issue (regardless of disposition — `accept-close`, `not-planned-close`, `close-failed`, `close-skipped (parse-error or all-conflict)`, `title-mismatch-skip`, any non-error result) is mid-run workflow when more issues remain. Ensure the just-finished per-issue row is `completed` (already flipped on the title-mismatch path; flip it now on the normal / parse-error paths) and mark the next per-issue row `in_progress` in the **next tool call** — never insert an interstitial summary or acknowledgment turn before resuming with the next issue's body parse / first `Read`. See `§ No-Stall Principle`.
+
+**Otherwise (this is the last issue in the queue — apply reminder #2):**
+
+> **Return-point no-stall reminder**: Finishing the last issue (regardless of disposition — any combination of `accept` / `reject` / `conflict` / `parse-error` across the run, any non-error result) is not a terminal point. Mark the last per-issue row `completed`, mark the `Step 3: Process each issue serially` phase row `completed`, and mark the `Step 3.7: Release bookkeeping` phase row `in_progress` in the **next tool call** (one `TodoWrite` call carrying all three flips), then proceed directly to Step 3.7 release bookkeeping. See `§ No-Stall Principle`.
+
 ### Step 3.7 — Release bookkeeping (after all issues processed)
 
 After every issue has been processed, perform a single bookkeeping pass to bump the marketplace version of every modified bundle skill plus `dev-workflow-bundle`, and record a CHANGELOG entry. This step runs **once per run**, not per issue.
 
+Entry state: the `Step 3.7: Release bookkeeping` row is already `in_progress` (flipped by Step 3.6's last-issue reminder #2). When this step terminates (any branch — including the (a) early-return), the boundary reminder at the bottom of this section handles the `completed` flip and the Step 4 `in_progress` flip in one `TodoWrite` call. (The 0-open-issues path in Step 2 does not enter this section — Step 3.7 was already flipped to `completed` there as part of the four-row flip.)
+
 The accepted-and-committed list, every per-Finding commit hash, and every (target-skill, Finding summary, issue-N, Category, Reason) tuple needed below are already held in memory from Step 3.4 — do not re-derive them by re-parsing git or the issue list.
 
-**(a) Early return**: if zero Findings were accepted-and-committed across the entire run, skip release bookkeeping; record `release-bookkeeping=skipped (no commits)`; proceed to Step 4.
+**(a) Early return**: if zero Findings were accepted-and-committed across the entire run, skip release bookkeeping; record `release-bookkeeping=skipped (no commits)`; proceed to the boundary reminder at the bottom of this section, then to Step 4.
 
 **(b) Modified-skill set**: from the accepted-and-committed list, build the unique set of `<target-skill>` values. Filter against the four-skill bundle whitelist (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`) — values outside the bundle are not expected here, but filter defensively.
 
@@ -245,11 +282,17 @@ On non-zero exit (typical case: a pre-commit hook rejection), recover with `git 
 
 On zero exit, capture `git rev-parse HEAD` as the bookkeeping commit hash for the Step 4 summary line `release-bookkeeping=<hash>`.
 
+After this step terminates (any branch), apply the following boundary reminder before proceeding to Step 4:
+
+> **Return-point no-stall reminder**: Step 3.7 termination (regardless of outcome — a successful commit hash, `skipped (no commits)`, `failed (version skew | json invalid | changelog edit error | scope leak | commit error)`, any non-error result) is not a terminal point. Mark `Step 3.7: Release bookkeeping` row `completed` and `Step 4: Emit summary` row `in_progress` in the **next tool call** (a single `TodoWrite` carrying both flips), then proceed directly to summary emission. See `§ No-Stall Principle`.
+
 ### Step 4 — Emit summary
 
 Print to stdout (the only trace a routine leaves). The summary has two sections — first the **Per-Finding execution log**, then the aggregate counters.
 
-**Per-Finding execution log** — one block per processed Finding in source order. Fields source from the per-Finding memory record in § Apply accepted Findings. **Each field renders its written value, or `—` if the record-write point was never reached** — this rule applies uniformly across all dispositions (`accept` / `reject` / `conflict` / `parse-error`), driven by which sub-steps actually ran for that Finding, not by the disposition itself. The `verify-diff` line carries an `[iter ...]` clause that follows these cases:
+Entry state: the `Step 4: Emit summary` row is already `in_progress` (flipped either by the Step 3.7 → Step 4 boundary reminder, or by the 0-open-issues path in Step 2). The final `completed` flip and the summary stdout output **must occur in the same tool-call burst**. See `§ No-Stall Principle` § Phase / per-issue TodoWrite transitions.
+
+**Per-Finding execution log** — one block per processed Finding in source order. Fields source from the per-Finding memory record in § Apply accepted Findings. When the run produced zero Finding records (e.g. the 0-open-issues path, or a run where every issue ended in title-mismatch with no Findings parsed), still render the `Per-Finding execution log` heading and emit a single placeholder line `(none — 0 Findings logged)` under it before the aggregate summary. **Each field renders its written value, or `—` if the record-write point was never reached** — this rule applies uniformly across all dispositions (`accept` / `reject` / `conflict` / `parse-error`), driven by which sub-steps actually ran for that Finding, not by the disposition itself. The `verify-diff` line carries an `[iter ...]` clause that follows these cases:
 
 - `verify_diff` ∈ {`converged`, `unresolved`, `skipped`, `conflict`} (the (d) sub-step ran): render `<token> [iter <iterations_used>/3]`
 - `verify_diff` = `disabled` (the (d) sub-step was skipped because `verify_diff_disabled=true`): render `disabled [iter —]`
@@ -272,7 +315,7 @@ issue #<N> Finding <n>: <accept|reject|conflict|parse-error>
 - verify-diff dispatches consumed: cumulative Agent-tool dispatches across the run (cost observability)
 - skill-review state: `enabled` or `disabled-after-errors`; count of Findings with `skill-review notes left`
 - Failure counts: `comment-failed` / `close-failed` / `commit-failed`, with (issue#, finding#) pairs
-- `overflow=true` notice if Step 2 hit the 200-issue cap
+- `overflow=true` notice if Step 2 hit the 50-issue cap (rendered as `50-issue cap reached`)
 - `release-bookkeeping`: one of `<commit-hash>` (success), `skipped (no commits)`, `failed (version skew: dev-workflow=<v1>, dev-workflow-bundle=<v2>)`, `failed (json invalid)`, `failed (changelog edit error)`, `failed (scope leak)`, or `failed (commit error)` — sourced from Step 3.7's outcome
 
 Always emit the summary, even on zero-activity runs — "ran but made no changes" must be distinguishable from "didn't run at all".
