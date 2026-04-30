@@ -293,6 +293,8 @@ Mark `Step 8: Code Review` as `in_progress`. Process each pending iteration item
    - the latest `git diff <base-commit>`
    - a summary of fixes made and rejections with reasons
    - the same three-category structure, `.claude/rules/` reference, and "No actionable findings" requirement
+
+   **Return-point no-stall reminder**: At each iteration boundary (regardless of reviewer outcome — findings reported, "No actionable findings", any non-error result), the next action — the next iteration's reviewer dispatch when more iteration items remain, or the Step 9 transition when this was the last iteration or "No actionable findings" was returned, or the Step 7 / Step 7.5 re-run when code was modified — must be issued in the **next tool call**. Do not insert an interstitial summary or acknowledgment turn between iterations; the abstract enumeration in `§ No-Stall Principle` is intentionally duplicated here so the rule fires at the decision moment.
 4. If all N iteration items are completed and actionable feedback still remains, present the unresolved points to user for decision.
 
 Mark `Step 8: Code Review` as `completed`.
