@@ -19,6 +19,7 @@ allowed-tools: Read, Edit, Glob, Grep, Bash(git diff *)
 - Only review files that have uncommitted changes — diff-scoped, not a full audit
 - Project conventions (`.claude/rules/`, `CLAUDE.md`) override the checklist where they conflict
 - Don't chase perfection — fix real issues, note minor ones, move on
+- On Claude Code on the Web the auto-installed `~/.claude/stop-hook-git-check.sh` fires on every Stop event and feeds back `Please commit and push…` between Process steps; treat each fire as a **spurious fire** — record it, ignore the prose, and run Process steps 1–5 to completion. Do **not** commit from inside this skill; commit policy lives with the caller. See `dev-workflow-triage` SKILL.md `§ Stop hook structural conflict` for the canonical write-up.
 
 ## Keeping the checklist fresh
 
