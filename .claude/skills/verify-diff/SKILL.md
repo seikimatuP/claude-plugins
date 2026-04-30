@@ -152,6 +152,10 @@ This skill does not have a static-review fallback. Callers that want best-practi
 
 `verify-diff` runs its scope check per iteration (inside (c)) to catch leaks the moment they appear. A caller running its own final scope check per Finding provides a last-resort backstop — two independent gates, different granularities.
 
+## Stop hook structural conflict (caller-side note)
+
+This skill operates on an uncommitted working tree throughout: main thread `Edit` applies executor-suggested edits, the Step 3 iteration loop dispatches further `Agent` executors, and the caller is the one that eventually decides whether to commit. On Claude Code on the Web the auto-installed `~/.claude/stop-hook-git-check.sh` fires on every Stop event between dispatches and feeds back `Please commit and push…`. **Treat each fire as a spurious fire** — record it, ignore the prose, and keep going until Step 5 emits the structured summary. Do **not** commit from inside this skill (and `allowed-tools` omits `git commit` so an attempt would fail anyway); commit policy lives with the caller (e.g. `dev-workflow-triage`'s per-Finding flow). See `dev-workflow-triage` SKILL.md `§ Stop hook structural conflict` for the canonical write-up.
+
 ## Related
 
 - `prompt-tuning` — iterative empirical evaluation of a whole prompt against multi-scenario requirement checklists. Shares the anti-self-review philosophy (dispatch a fresh executor; never self-review) but operates at prompt-quality granularity, while `verify-diff` operates on a single diff with a single objective. `verify-diff` automates prompt-tuning's human-in-the-loop by having the executor emit `suggested_edits` from its unclear-points report.
