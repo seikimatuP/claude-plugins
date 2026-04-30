@@ -65,7 +65,7 @@
       "description": "Extract project-specific coding rules from codebase for AI agents",
       "source": "./skills/extract-rules",
       "skills": ["./"],
-      "version": "1.13.0",
+      "version": "1.13.1",
       "author": {
         "name": "hiropon"
       },

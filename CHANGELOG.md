@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-04-30
+
+### extract-rules v1.13.1
+
+- docs(extract-rules): Translate remaining Japanese comments in the Usage block to English
+  - The `/extract-rules --from-pr` examples in `## Usage` carried Japanese comments (`カレントリポのPR指定`, `他リポのPR指定（URL形式も可）`, `範囲指定（カレントリポ）`, `範囲指定（他リポ）`, `複数指定可（スペース区切り）→ 横断分析で組織重視の原則を検出`). Project rules require distributed artifacts (SKILL.md included) to be in English; the comments now read `PR in current repo`, `PR in another repo (URL form also accepted)`, `PR range (current repo)`, `PR range (another repo)`, and `Multiple specs allowed (space-separated) → cross-analysis detects org-wide principles`. No behavioral change
+
 ## 2026-04-25
 
 ### dev-workflow v1.34.2 / dev-workflow-bundle v1.34.2
