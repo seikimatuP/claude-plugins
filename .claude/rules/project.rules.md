@@ -84,6 +84,8 @@
 - `Edit` で plugin の version を書き換えるときの `old_string` には plugin name + 周辺 + version を含める塊を取り、name の閉じる double-quote と末尾 `,` まで必ず含める（例: `"name": "dev-workflow",`）。`"name": "dev-workflow"` のように trailing カンマを含めないと `"name": "dev-workflow-bundle"` の prefix と被って not-unique error になる。`replace_all` は禁止
 - 自動化スクリプトやルーチンスキルでスキルを更新した場合、CHANGELOG.md / marketplace.json の version bump は **per-Finding コミットとは別の bookkeeping commit** にまとめる（`chore(release): bump <plugins> (auto-triage YYYY-MM-DD)` のような subject）。「1 accepted Finding = 1 commit」ルールを維持し、scope check の意味を保つため
 - CHANGELOG.md のエントリは新しい version subsection を `## YYYY-MM-DD` 直下に **prepend** する（既存スタイル「新しい version が上」と整合）。同日複数 invocation が起きうる場合、commit subject 末尾に `(auto-triage YYYY-MM-DD)` 等のサフィックスを付けて commit log で区別できるようにする
+- CHANGELOG.md のエントリ本文（fix の根拠説明など）で過去 commit を参照する場合は、生の commit hash（例: ``fcf70b2``）ではなく、既存スタイルに合わせて `auto-triage #N` 形式の参照を使う。CHANGELOG のすべての既存 entry がこの形式（`auto-triage #5` / `#6` / `#7`）を採用しており、commit hash 直接参照は repo の reword / rebase で安定性が下がる + 既存スタイルとの一貫性が崩れる
+- CHANGELOG.md の各 fix entry に付ける `Category:` token は既存 taxonomy（`missing-branch` / `ambiguity` / `wrong-default`）の closed list から選ぶ。新規の記述的 token（`distribution-leak` / `scope-leak` 等）を発明しない。既存 entry を全て確認すると上記 3 種以外は使われておらず、taxonomy 拡張は CHANGELOG 全体の一貫性を崩す。新しい failure mode が既存 token に収まらない場合は、まず 3 種のいずれにマップ可能かを judgment し、それでも収まらないと判断したら CHANGELOG ルール自体を改定してから新 token を導入する
 
 ## Examples
 

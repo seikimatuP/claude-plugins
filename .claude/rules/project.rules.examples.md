@@ -423,3 +423,31 @@ If validation fails, emit an error verdict.
 - skill-review notes left (1)
 ```
 （同一文字列に集約すると user が「どの sub-source が threshold を踏んだか」を identify できず、後追い triage で原因切り分け不能）
+
+### CHANGELOG entry での過去 commit 参照
+**Good** (CHANGELOG.md fix entry 本文):
+```markdown
+- fix(ask-peer): generalize peer reviewer "operational reality" prompt to remove skill-bundle internal vocabulary (subtask 1 of meta-scope-leak)
+  - Category: wrong-default; The peer personality "Planning" focus area inherited `subagent dispatch and time budgets` / `sub-dispatches` from auto-triage #6, which defaulted to skill-bundle internal vocabulary instead of language-agnostic wording.
+```
+（過去 commit 参照は `auto-triage #6` 形式で、既存 entry スタイルと一貫）
+**Bad:**
+```markdown
+- fix(ask-peer): generalize peer reviewer "operational reality" prompt
+  - Category: wrong-default; ... inherited from the auto-triage #6 commit `fcf70b2`, which defaulted to skill-bundle internal vocabulary ...
+```
+（生の commit hash `fcf70b2` を埋めると repo の reword / rebase で安定性が下がる + 既存 entry の `auto-triage #N` のみ参照スタイルから外れる）
+
+### CHANGELOG `Category:` token の closed taxonomy
+**Good** (CHANGELOG.md fix entry):
+```markdown
+- fix(ask-peer): generalize peer reviewer prompt
+  - Category: wrong-default; ...
+```
+（`missing-branch` / `ambiguity` / `wrong-default` の closed list から選択）
+**Bad:**
+```markdown
+- fix(ask-peer): generalize peer reviewer prompt
+  - Category: distribution-leak; The reviewer prompt leaked skill-bundle internal vocabulary to general-purpose reviewers...
+```
+（`distribution-leak` / `scope-leak` のような新規記述的 token を発明すると CHANGELOG 全体の taxonomy 一貫性が崩れる。新 failure mode は既存 3 種にマップ可能か再検討する — 上記の例なら「default 値が generic でなく skill-bundle internal だった」= `wrong-default` にマップできる）

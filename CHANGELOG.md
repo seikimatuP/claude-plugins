@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-01
+
+### ask-peer v2.2.3 / dev-workflow-bundle v1.34.4
+
+- fix(ask-peer): generalize peer reviewer "operational reality" prompt to remove skill-bundle internal vocabulary (subtask 1 of meta-scope-leak)
+  - Category: wrong-default; The peer personality "Planning" focus area inherited `subagent dispatch and time budgets` / `sub-dispatches` from auto-triage #6, which defaulted to skill-bundle internal vocabulary instead of language-agnostic wording. These tokens confuse general-purpose project reviewers. Replaced with `compute and time budgets` / `operations`; the `N × M` sanity-check example survives.
+
 ## 2026-04-30
 
 ### ask-peer v2.2.2 / dev-workflow-bundle v1.34.3
