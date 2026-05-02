@@ -1,12 +1,20 @@
 ---
 name: skill-review
 description: Review uncommitted skill changes against an internal checklist of skill-creator best practices and apply improvements. Use this whenever the user asks to "review skills", "check best practices", "improve SKILL.md", or wants a quality check on skill files before committing. Use this when there are uncommitted diffs in SKILL.md, README.md, or references/ files under skills/ or .claude/skills/. This is for reviewing existing skill changes, not creating new skills from scratch. Runs standalone — no external skill dependencies.
-allowed-tools: Read, Edit, Glob, Grep, Agent, Bash(git diff *), Bash(git checkout *)
+allowed-tools: Read, Edit, Agent, TodoWrite, Bash(git diff *), Bash(git checkout HEAD -- *)
 ---
 
 # Skill Review
 
-The review walk runs in a fresh subagent (Pattern A — same shape as `verify-diff` and `rules-review`); Edit application stays in the main thread to keep the reviewer bias-free. Designed to be called from non-interactive routines such as `dev-workflow-triage` (d2) or `dev-workflow` `hooks.on_complete`; it never prompts the user.
+The review walk runs in a fresh subagent per iteration (Pattern A — same shape as `verify-diff` and `publicity-review`); Edit application stays in the main thread to keep the reviewer bias-free. The skill loops the dispatch + apply cycle until the subagent returns no more `mechanical_edits`, max iterations is reached, or a safety rail trips. Designed to be called from non-interactive routines such as `dev-workflow-triage` (d2) or `dev-workflow` `hooks.on_complete`; it never prompts the user.
+
+## Invocation contract
+
+The caller passes this field in natural language (the skill extracts it from the invocation text):
+
+- `Max iterations` *(optional, default `3`)* — upper bound on the refinement loop. Default `3` mirrors `verify-diff`'s default; prose-quality polish typically converges in 1–2 iterations.
+
+The caller must **not** stage changes while this skill is running. The skill reads the working tree; staged content would mix into the diff and corrupt the verdict.
 
 ## Process
 
@@ -14,19 +22,26 @@ The review walk runs in a fresh subagent (Pattern A — same shape as `verify-di
 
 1. Run `git diff --name-only` and `git diff --name-only --cached` to find uncommitted changes
 2. Filter to files matching `skills/*/SKILL.md`, `skills/*/README.md`, `skills/*/references/*`, `.claude/skills/*/SKILL.md`, `.claude/skills/*/references/*`
-3. If no skill files changed, emit the verdict `{"status": "no-actionable-findings", "applied_edits_count": 0, "notes_remaining_count": 0, "reason": null}` per `§ Return contract` and stop
+3. Hold the filtered set in main-thread context as `changed_files` (the scope-check baseline for Step 3 (c)).
+4. If `changed_files` is empty, emit the verdict `{"status": "no-actionable-findings", "iterations_used": 0, "applied_edits_count": 0, "notes_remaining_count": 0, "reason": null}` per `§ Return contract` and stop. `iterations_used: 0` because the iteration loop never runs (mirrors `verify-diff`'s "Step 1 early returns count as 0" rule).
 
 ### Step 2 — Gather review inputs (main thread)
 
 For each changed skill, in the main thread:
 
-1. `Read` the full `SKILL.md` and any changed `references/` or `README.md` files
-2. `Read` `references/best-practices.md`
-3. Pre-capture each changed file's `git diff` so the subagent does not need to run git itself. For staged-only changes, use `git diff --cached -- <file>`; for working-tree-only changes, use `git diff -- <file>`; if both have content (mixed staged + unstaged edits to the same file), concatenate them — staged section first — into one unified diff payload
+1. `Read` the full `SKILL.md` and any changed `references/` or `README.md` files. Hold the contents in main-thread context as the iter-1 snapshot.
+2. `Read` `references/best-practices.md`.
+3. Pre-capture each changed file's `git diff`. For staged-only changes, use `git diff --cached -- <file>`; for working-tree-only changes, use `git diff -- <file>`; if both have content (mixed staged + unstaged edits), concatenate them — staged section first — into one unified diff payload.
 
-### Step 3 — Dispatch reviewer Agent
+### Step 3 — Iteration loop (i = 1 .. Max iterations)
 
-Invoke the `Agent` tool to dispatch a fresh reviewer. Assemble the dispatch prompt from the four sections below, each framed with a clear `--- LABEL ---` fence (same convention as `verify-diff` § Step 3 (a) Dispatch bias-free executor) so the reviewer can parse each payload unambiguously:
+**Pre-register iteration TodoWrite items** — before entering the loop, create `iteration 1`, `iteration 2`, ..., `iteration <Max iterations>` TodoWrite items. Mark `in_progress` before each dispatch, `completed` after parse + apply (a converged iteration marks `completed` immediately after parsing). On early convergence (no `mechanical_edits` returned) or safety-rail-triggered exit, mark remaining iteration items `completed` with note appended to the item's `content` field as `— skipped: converged` / `— skipped: <reason>`. Pre-registration mirrors `verify-diff` Step 3 — without it, the executor-driven loop tends to stop at the first iteration that looks acceptable.
+
+#### (a) Dispatch reviewer Agent
+
+On `i == 1`, use the snapshot from Step 2. On `i ≥ 2`, only re-`Read` the subset of `changed_files` whose path appeared in a successfully-applied `mechanical_edits` entry during iter `i - 1` (untouched files keep their iter-1 snapshot — re-reading them is wasted work and balloons main-thread context — same convention as `publicity-review` Step 2 (a)). On `i ≥ 2`, also re-run the per-file `git diff` so the diff payload reflects edits that landed in prior iterations.
+
+Invoke the `Agent` tool to dispatch a fresh reviewer. Assemble the dispatch prompt from the four sections below, each framed with a clear `--- LABEL ---` fence (same convention as `verify-diff` § Step 3 (a) Dispatch bias-free executor and `publicity-review` § Step 2 (a) Dispatch reviewer Agent) so the reviewer can parse each payload unambiguously:
 
 - `--- BEST PRACTICES CHECKLIST ---`: the full content of `references/best-practices.md`
 - `--- CHANGED FILES ---`: each changed skill file's path, full content, and unified diff (one block per file, separated by `### <path>` sub-headings)
@@ -47,6 +62,8 @@ Invoke the `Agent` tool to dispatch a fresh reviewer. Assemble the dispatch prom
 > - **structural_note**: a fix that requires moving content between files, deleting sections, or rewriting large portions of a section. Return as a `{file, description}` note. These will **not** be applied automatically — the caller surfaces them via `notes_remaining_count`
 >
 > `old_string` must match exactly one location in the current file. Include **1–3 lines of surrounding context** so the snippet is unique — short one-liners collide and cause the Edit to fail.
+>
+> **Gate reachability rule (required)**: when there are no actionable mechanical findings on this iteration, you **must** return `mechanical_edits: []`. Do not emit speculative or "nice to have" edits — `mechanical_edits == []` is the convergence signal and must be empty when no apply work remains. Continuing to flag issues only as `structural_notes` is fine; that is the documented exit path for non-mechanical findings.
 
 **Response format (include verbatim in the dispatch):**
 
@@ -65,35 +82,50 @@ Invoke the `Agent` tool to dispatch a fresh reviewer. Assemble the dispatch prom
 > ```
 > ````
 
-**Agent unavailable fallback**: detect availability and fall back per the canonical write-up in `rules-review` SKILL.md `§ 5. Review` (the "Detecting Agent availability" / "Fallback when Agent is unavailable" paragraphs). The skill-review specialization: when falling back, walk the embedded checklist over each changed file inline-sequentially in the main thread and emit the same fenced JSON block defined above so Step 4's parser handles both paths identically.
+**Agent unavailable fallback**: detect availability and fall back per the canonical write-up in `rules-review` SKILL.md `§ 5. Review` (the "Detecting Agent availability" / "Fallback when Agent is unavailable" paragraphs). The skill-review specialization: when falling back, walk the embedded checklist over each changed file inline-sequentially in the main thread once per iteration and emit the same fenced JSON block defined above so step (b)'s parser handles both paths identically.
 
-### Step 4 — Parse & apply (main thread)
+#### (b) Parse & apply — evaluate in this order, first match wins
 
-Parse the subagent's fenced JSON response. Evaluate in this order, **first match wins** (same evaluate-in-order discipline as `verify-diff` § (b) Parse & apply, restricted to the cases that apply to a single-pass dispatch):
+Same first-match-wins evaluate-in-order discipline as `verify-diff` § (b) Parse & apply.
 
-1. **Verdict missing or malformed** — no fenced JSON block found, or JSON parse fails → emit `{"status": "error", "applied_edits_count": 0, "notes_remaining_count": 0, "reason": "verdict parse failure"}` and stop
-2. **Schema violation** — required keys (`mechanical_edits`, `structural_notes`) are missing, values are not arrays, or any entry fails its expected shape (`mechanical_edits` entries must have non-empty string `file`, `old_string`, `new_string`; `structural_notes` entries must have non-empty string `file`, `description`) → emit `{"status": "error", "applied_edits_count": 0, "notes_remaining_count": 0, "reason": "verdict schema violation"}` and stop. Validating entry shape here prevents a malformed entry from crashing the `Edit` call later
-3. **Otherwise** — proceed with apply
+1. **Verdict missing or malformed** — no fenced JSON block found, or JSON parse fails → exit loop with terminal `{"status": "error", "iterations_used": <i>, "applied_edits_count": <cumulative>, "notes_remaining_count": 0, "reason": "verdict parse failure"}`. Do not consume remaining iter slots.
+2. **Schema violation** — required keys (`mechanical_edits`, `structural_notes`) are missing, values are not arrays, or any entry fails its expected per-entry shape (`mechanical_edits` entries must have non-empty string `file`, `old_string`, `new_string`; `structural_notes` entries must have non-empty string `file`, `description`) → exit loop with terminal `{"status": "error", "iterations_used": <i>, "applied_edits_count": <cumulative>, "notes_remaining_count": 0, "reason": "verdict schema violation"}`. Validating per-entry shape here prevents a malformed entry from crashing a downstream `Edit` call.
+3. **No more apply work** — `mechanical_edits == []` → exit loop. Determine the terminal status from cumulative state and the current iter's `structural_notes`:
+   - cumulative `applied_edits_count == 0` AND `structural_notes == []` → `no-actionable-findings`
+   - cumulative `applied_edits_count > 0` AND `structural_notes == []` → `applied-edits` (notes count = 0)
+   - `structural_notes != []` (regardless of cumulative count) → if cumulative > 0 then `applied-edits` (with `notes_remaining_count > 0`), else `notes-left`
 
-**Apply mechanical edits**:
+   No divergence detection: `mechanical_edits == []` already captures "no more apply work", and `structural_notes` are not applied (they persist by design), so a divergence rule keyed on `structural_notes` would always trigger after iter 2.
+4. **Otherwise** — apply `mechanical_edits` in order:
+   - For each entry, re-`Read` the target file (so `old_string` matches the current contents after any earlier edit landed), then call `Edit`.
+   - If an `old_string` is not found, skip that entry and continue with the next. This is expected when the subagent emits multiple edits from a single snapshot and a later edit overlaps a region an earlier one already rewrote — the skip is a no-op fallback, not an error.
+   - Increment `applied_edits_count` only for entries whose `Edit` call succeeded — skipped entries do not count.
+   - After the edits (applied or skipped), if at least one Edit succeeded, run the safety rails in (c), then continue to iteration `i + 1`. If all entries skipped, also continue (the next iter will re-dispatch with the current file state).
 
-- For each entry in `mechanical_edits`, re-`Read` the target file (so `old_string` matches the current contents after any earlier edit landed), then call `Edit`
-- If `old_string` is not found, skip that entry and continue with the next. This is expected when the subagent emits multiple edits from a single snapshot and a later edit overlaps a region an earlier one already rewrote — the skip is a no-op fallback, not an error
-- Increment `applied_edits_count` only for entries whose `Edit` call succeeded — skipped entries do not count
+#### (c) Per-iteration safety rails — run only if at least one edit was applied
 
-**Surface structural notes**:
+- **Frontmatter integrity** — for each edited file that begins with a `---`-delimited YAML frontmatter block, re-`Read` and parse the frontmatter. If parsing fails:
+  ```
+  git checkout HEAD -- <file>
+  ```
+  Exit loop with terminal `{"status": "error", "iterations_used": <i>, "applied_edits_count": 0, "notes_remaining_count": 0, "reason": "frontmatter broken"}` — the revert wipes the edited file's prior-iter edits as well, so `applied_edits_count` reflects the on-disk surviving edits (typically `0` since most invocations edit a single skill file across iters; if a multi-file invocation has surviving in-scope edits to other files, report the count of those). Files without a frontmatter block skip this rail.
+- **Scope** — run `git diff --name-only`. If any returned path is **not** in `changed_files`:
+  ```
+  git checkout HEAD -- <each offending path>
+  ```
+  Exit loop with terminal `{"status": "error", "iterations_used": <i>, "applied_edits_count": <cumulative>, "notes_remaining_count": 0, "reason": "scope violation"}` — the revert only touches the offending out-of-scope paths, so in-scope `Edit` calls from earlier iters remain on disk and `applied_edits_count` reflects their cumulative count.
 
-- Set `notes_remaining_count = len(structural_notes)`
-- Do not apply structural notes. They are reported through the verdict; the caller decides whether and how to act on them. The skill itself does not run a user-confirm dialogue
+### Step 4 — Max iterations reached without convergence
 
-### Step 5 — Verify and emit verdict (main thread)
+If the loop runs all `Max iterations` without (b) sub-case 3 firing (i.e. the subagent kept emitting `mechanical_edits` to the end, but apply progress stalled — typically all entries skipping because `old_string` collisions), determine the terminal status from cumulative state and the **last iter's** `structural_notes`:
 
-1. Re-`Read` each changed file to confirm fixes landed correctly
-2. **Safety rail (frontmatter integrity)**: for each edited file that begins with a `---`-delimited YAML frontmatter block, parse the frontmatter. If parsing fails, run `git checkout HEAD -- <file>` to revert that file, then emit `{"status": "error", "applied_edits_count": 0, "notes_remaining_count": 0, "reason": "frontmatter broken"}` and stop. Files without a frontmatter block (plain references, plain README) skip this rail
-3. **Safety rail (scope)**: run `git diff --name-only`. If any path outside the Step 1 changed-file set appears, run `git checkout HEAD -- <each offending path>` and emit `{"status": "error", "applied_edits_count": 0, "notes_remaining_count": 0, "reason": "scope violation"}` and stop
-4. **Normal verdict**: emit one of `no-actionable-findings` (no edits applied AND no notes), `applied-edits` (`applied_edits_count > 0`), or `notes-left` (`applied_edits_count == 0` AND `notes_remaining_count > 0`) per `§ Return contract`. Counters reflect the apply phase outcome
+- cumulative `applied_edits_count > 0` → `applied-edits` (notes_remaining = last-iter `structural_notes` count)
+- cumulative `applied_edits_count == 0` AND last-iter `structural_notes == []` → `no-actionable-findings` (rare degenerate case: subagent emitted unappliable edits but no notes; debug-wise suspect subagent quality drift, but the file state is clean)
+- cumulative `applied_edits_count == 0` AND last-iter `structural_notes != []` → `notes-left`
 
-The fenced JSON here is the invocation's **terminal output** — see `§ Return contract`'s *Sub-skill caller directive*.
+### Step 5 — Emit verdict
+
+End your response with a single fenced JSON block matching the schema in `§ Return contract`. The fenced JSON here is the invocation's **terminal output** — see `§ Return contract`'s *Sub-skill caller directive*.
 
 ## Scope
 
@@ -101,44 +133,53 @@ The fenced JSON here is the invocation's **terminal output** — see `§ Return 
 - Project conventions (`.claude/rules/`, `CLAUDE.md`) override the checklist where they conflict
 - Don't chase perfection — fix real issues, note minor ones, move on
 - On Claude Code on the Web the auto-installed `~/.claude/stop-hook-git-check.sh` fires on every Stop event and feeds back `Please commit and push…` between Process steps; treat each fire as a **spurious fire** — record it, ignore the prose, and run Process steps 1–5 to completion. Do **not** commit from inside this skill; commit policy lives with the caller. See `dev-workflow-triage` SKILL.md `§ Stop hook structural conflict` for the canonical write-up.
-- **Sub-skill no-stall (caller-side note)**: when this skill runs as a sub-skill, the fenced JSON verdict from `§ Return contract` is the terminal output and structural changes are surfaced via `notes_remaining_count` rather than applied. The canonical no-stall write-up is `dev-workflow-triage` SKILL.md `§ No-Stall Principle`; see also `§ Return contract`'s *Sub-skill caller directive* for the contract-side restatement.
+- **Sub-skill no-stall (caller-side note)**: when this skill runs as a sub-skill, the fenced JSON verdict from `§ Return contract` is the terminal output of the invocation and structural changes are surfaced via `notes_remaining_count` rather than applied. The caller decides the next step based on the verdict — this skill does not encode the caller's flow. The canonical no-stall write-up is `dev-workflow-triage` SKILL.md `§ No-Stall Principle`; see also `§ Return contract`'s *Sub-skill caller directive* for the contract-side restatement.
 
 ## Return contract
 
-This skill follows the same **contract pattern** as `verify-diff` § Step 5 — Emit structured summary: a single fenced JSON block at the very end of the invocation. Only one fenced JSON block must appear in the response — the verdict block — so callers can locate it unambiguously.
+This skill follows the same **contract pattern** as `verify-diff` § Step 5 — Emit structured summary and `publicity-review` § Step 4 — Emit structured summary: a single fenced JSON block at the very end of the invocation. Only one fenced JSON block must appear in the response — the verdict block — so callers can locate it unambiguously.
 
 End every invocation with a single fenced JSON block matching this schema:
 
 ```json
 {
   "status": "no-actionable-findings|applied-edits|notes-left|error",
+  "iterations_used": N,
   "applied_edits_count": N,
   "notes_remaining_count": N,
-  "reason": "verdict parse failure|verdict schema violation|frontmatter broken|scope violation|null"
+  "reason": "verdict parse failure|verdict schema violation|frontmatter broken|scope violation|dispatch error|null"
 }
 ```
+
+The `|null` token at the end of the `reason` enum means JSON `null` (not the string `"null"`).
 
 Field semantics:
 
 - `status`:
-  - `no-actionable-findings`: the checklist walk produced nothing actionable for the changed-file scope
-  - `applied-edits`: at least one mechanical fix was applied this invocation
-  - `notes-left`: at least one item was flagged but `applied_edits_count == 0` (only structural changes were flagged, surfaced via `notes_remaining_count`)
+  - `no-actionable-findings`: the iteration loop converged with cumulative `applied_edits_count == 0` AND no `structural_notes` outstanding
+  - `applied-edits`: at least one mechanical fix was applied across the iteration loop (cumulative `applied_edits_count > 0`); `notes_remaining_count` may be `0` (clean convergence) or `> 0` (notes alongside applied edits)
+  - `notes-left`: cumulative `applied_edits_count == 0` AND `notes_remaining_count > 0` (only structural changes were flagged, surfaced via `notes_remaining_count`)
   - `error`: an internal error occurred — see `reason`
-- `applied_edits_count`: non-negative integer count of `Edit` calls that successfully landed. `0` for any `error` status (the apply phase either was not entered or its results were reverted)
-- `notes_remaining_count`: non-negative integer. Count of structural / still-actionable items the subagent flagged but the skill did not apply (Pattern A surfaces these via this counter rather than running a dialogue). Always `0` for `no-actionable-findings` and any `error` status
+- `iterations_used`: number of iterations whose subagent dispatch returned a verdict, **including the iteration whose verdict triggered convergence**. Step 1 early returns (no changed skill files) count as `0`, mirroring `verify-diff`'s rule
+- `applied_edits_count`: non-negative integer count of `Edit` calls whose result is still on disk at the time the verdict is emitted. For `verdict parse failure` / `verdict schema violation` / `dispatch error` / `scope violation`, this is the cumulative count of successful `Edit` calls across earlier iterations of the same invocation (none of these recovery paths revert in-scope edits — `scope violation` only reverts the offending out-of-scope paths). The exception is `frontmatter broken`: its recovery (`git checkout HEAD -- <edited file>`) reverts the edited skill file itself, wiping any earlier-iter edits to that file; the count drops accordingly (typically to `0` since most invocations edit a single skill file across iters, but multi-file invocations may report the count of surviving edits to other files)
+- `notes_remaining_count`: non-negative integer. Count of structural / still-actionable items flagged in the **terminal iteration** but not applied (Pattern A surfaces these via this counter rather than running a dialogue). Always `0` for `no-actionable-findings` and any `error` status
 - `reason`: enum string only when `status == "error"`, otherwise JSON `null`. Keep `reason` payloads to the listed enum tokens — no free-form text, newlines, or control characters — so the verdict stays mechanically parseable
 
-**When to emit `status: "error"`**: the skill emits `error` when it detects a problem before completing the apply phase. Conditions:
+**When to emit `status: "error"`**: the skill emits `error` when it detects a problem during the iteration loop. Conditions:
 
-- `reason: "verdict parse failure"` — Step 4 found no fenced JSON block in the subagent response, or JSON parse failed
-- `reason: "verdict schema violation"` — Step 4 parsed the JSON but required keys (`mechanical_edits`, `structural_notes`) are missing, values are not arrays, or any entry fails the per-entry shape spec
-- `reason: "frontmatter broken"` — Step 5 re-read after Edit shows the YAML frontmatter no longer parses; the offending file is reverted via `git checkout HEAD -- <file>`
-- `reason: "scope violation"` — Step 5 `git diff --name-only` lists paths outside the changed-file scope captured at Step 1; the offending paths are reverted
+- `reason: "verdict parse failure"` — an iteration found no fenced JSON block in the subagent response, or JSON parse failed
+- `reason: "verdict schema violation"` — an iteration parsed the JSON but required keys (`mechanical_edits`, `structural_notes`) are missing, values are not arrays, or any entry fails the per-entry shape spec
+- `reason: "frontmatter broken"` — a per-iteration safety rail (Step 3 (c)) re-read after Edit shows the YAML frontmatter no longer parses; the offending file is reverted via `git checkout HEAD -- <file>`
+- `reason: "scope violation"` — a per-iteration safety rail (Step 3 (c)) `git diff --name-only` lists paths outside the `changed_files` scope captured at Step 1; the offending paths are reverted
+- `reason: "dispatch error"` — an `Agent` tool call errored, timed out, or returned an empty response (see `§ Dispatch failure` below)
 
 In each `error` case, surface the verdict via the JSON instead of attempting recovery; the caller decides how to handle it. Verdict-block-level failures on the caller side (caller cannot find or parse the JSON this skill emits) are caller-side concerns and are not produced by this skill — see the orchestrator's mapping table for that handling.
 
-**Sub-skill caller directive**: when invoked as a sub-skill from `dev-workflow-triage`'s `§ Apply accepted Findings (sub-flow (a)-(g) per Finding)` (d2) bullet, this JSON block is the terminal output of the invocation. Do **not** produce any additional turn after the JSON — the caller's mid-Finding flow continues with sub-step (f) Scope check + stage. See `dev-workflow-triage` SKILL.md `§ No-Stall Principle` for the canonical write-up. Other callers (e.g. `dev-workflow`'s `hooks.on_complete` mechanism) inherit the same emit-and-stop discipline by convention, but the no-stall load-bearing case is `dev-workflow-triage` because that caller is the one that re-engages a queued next sub-step.
+**Sub-skill caller directive**: when invoked as a sub-skill, this JSON block is the terminal output of the invocation. Do **not** produce any additional turn after the JSON — the caller continues per their own flow logic. See `dev-workflow-triage` SKILL.md `§ No-Stall Principle` for the canonical write-up of the caller-side no-stall discipline; the orchestrator's mapping table at `§ Apply accepted Findings (sub-flow (a)-(g) per Finding)` (d2) consumes this verdict and decides the next action.
+
+## Dispatch failure
+
+If the `Agent` tool call itself errors, times out, or returns an empty response on any iteration, exit the loop with terminal `{"status": "error", "iterations_used": <i>, "applied_edits_count": <cumulative>, "notes_remaining_count": 0, "reason": "dispatch error"}`. Do not re-walk the checklist yourself as a fallback — self-review reintroduces the bias this skill exists to avoid.
 
 ## Keeping the checklist fresh
 

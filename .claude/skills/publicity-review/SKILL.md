@@ -42,7 +42,7 @@ The caller must **not** stage changes while this skill is running. The skill rea
 
 On iter 1, `Read` the full current contents of each `affected_files` entry. On `i ≥ 2`, only re-`Read` the subset of `affected_files` whose path appeared in a successfully-applied `suggested_edits` entry during iter `i-1` (untouched files keep their iter-1 snapshot — re-reading them is wasted work and balloons main-thread context). On `i ≥ 2`, also re-run `git diff <Base ref>` so the diff reflects edits that landed in prior iterations.
 
-Invoke the `Agent` tool to dispatch a fresh reviewer. Assemble the dispatch prompt from the four sections below, each framed with a clear `--- LABEL ---` fence (same convention as `verify-diff` § Step 3 (a) Dispatch bias-free executor and `skill-review` § Step 3 — Dispatch reviewer Agent) so the reviewer can parse each payload unambiguously:
+Invoke the `Agent` tool to dispatch a fresh reviewer. Assemble the dispatch prompt from the four sections below, each framed with a clear `--- LABEL ---` fence (same convention as `verify-diff` § Step 3 (a) Dispatch bias-free executor and `skill-review` § Step 3 (a) Dispatch reviewer Agent) so the reviewer can parse each payload unambiguously:
 
 - `--- DIFF ---`: the unified diff (current `git diff <Base ref>` output)
 - `--- AFFECTED FILES ---`: each `affected_files` entry's path + full current contents (one block per file, separated by `### <path>` sub-headings)
@@ -218,5 +218,5 @@ On Claude Code on the Web the auto-installed `~/.claude/stop-hook-git-check.sh` 
 ## Related
 
 - `verify-diff` — empirical diff verification with subagent-driven iteration; same Pattern A iteration shape, different objective (does the diff achieve its stated goal vs. does the diff contain leak material).
-- `skill-review` — single-pass best-practices review for skill files; same fenced JSON return contract pattern, different scope (skill files only, single-pass, applies mechanical edits autonomously).
+- `skill-review` — Pattern A iteration loop best-practices review for skill files; same fenced JSON return contract pattern, different scope (skill files only, applies mechanical edits autonomously).
 - `rules-review` — diff-scoped check against `.claude/rules/`; canonical site for the "Agent unavailable fallback" write-up this skill references.

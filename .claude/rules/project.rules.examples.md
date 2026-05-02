@@ -141,7 +141,7 @@ a warning line in the Step 4 summary. Do not abort.
 ## Stop hook structural conflict
 
 **Conflict mechanism**: the per-Finding flow in `§ 3.4 Apply accepted Findings`
-runs `(b) Edit → (d) Skill(verify-diff) → (d2) Skill(skill-review) ×3 →
+runs `(b) Edit → (d) Skill(verify-diff) → (d2) Skill(skill-review) →
 (g) commit`. Each subagent dispatch creates a turn boundary, and uncommitted
 state between (b) and (g) is **normal**. The hook fires every boundary.
 
@@ -230,7 +230,7 @@ counter, and proceed to the next Finding.
 |---|---|---|
 | `no-actionable-findings` | `clean` | proceed to (f) |
 | `applied-edits` | `notes left after applied-edits (<n>)` if `notes_remaining_count > 0` else `clean` | proceed to (f) |
-| `notes-left` | `notes left after 3 iters (<n>)` | proceed to (f) |
+| `notes-left` | `notes left after max iters (<n>)` | proceed to (f) |
 | `error` / parse-failure | `parse-error` | terminate (d2), no retry |
 ```
 （verify-diff の `Verdict missing or malformed` style と整合させ、JSON 経路の `error` と parse-failure を別経路として明文化）
@@ -414,7 +414,7 @@ If validation fails, emit an error verdict.
 **Good** (Step 4 aggregate summary):
 ```text
 - skill-review notes left after applied-edits (3)   # M2: applied-edits 経路の残 notes
-- skill-review notes left after 3 iters (1)         # M2: iter 上限到達経路の残 notes
+- skill-review notes left after max iters (1)        # M2: callee internal max iter 到達経路の残 notes
 ```
 （同じ `notes_remaining_count` でも sub-condition が違うので warning 文字列を differentiate、SKILL.md にも区別意図を 1 行明記）
 **Bad:**

@@ -41,8 +41,10 @@ Quick reference for per-case dispositions. SKILL.md's procedural prose is author
 | verify-diff returns `skipped` (reason codes defined in `.claude/skills/verify-diff/SKILL.md` § Step 4) | Per-Finding warning `verify-diff skipped (<reason>)`; proceed to (d2) |
 | verify-diff returns `conflict` (reason codes defined in `.claude/skills/verify-diff/SKILL.md` § Step 4) | Per-Finding `conflict`; `git checkout HEAD -- <reverted_paths>` (idempotent safety re-run since verify-diff already reverted internally); skip (d2); continue |
 | 2 consecutive Findings with verify-diff `skipped` or `conflict` (counter resets on `converged` / `unresolved` — any successful-or-still-functioning return between errors breaks the streak) | Set `verify_diff_disabled=true`; skip verify-diff for rest of run; warn on each affected Finding |
-| skill-review returns no findings in ≤ 3 iterations | Proceed to commit |
-| skill-review still flags findings after 3 iterations | Proceed to commit; add warning `skill-review notes left (<n>)` in the comment |
+| skill-review returns `no-actionable-findings` terminal verdict | Proceed to commit |
+| skill-review returns `applied-edits` terminal verdict with `notes_remaining_count == 0` | Proceed to commit |
+| skill-review returns `applied-edits` terminal verdict with `notes_remaining_count > 0` | Proceed to commit; add warning `skill-review notes left after applied-edits (<n>)` in the comment |
+| skill-review returns `notes-left` terminal verdict | Proceed to commit; add warning `skill-review notes left after max iters (<n>)` in the comment |
 | skill-review returns an error response | Per-Finding warning `skill-review error (<reason>)`; skip polish for this Finding |
 | 2 consecutive Findings with skill-review errors | Set `skill_review_disabled=true`; skip polish for the rest of the run; warn on each affected Finding |
 | `git diff` shows a path outside `skills/` after (d) | Per-Finding `conflict`; `git checkout HEAD -- <paths>`; continue |
@@ -68,7 +70,7 @@ Use this shape when building the `--body-file` content in the "Post triage comme
 - **Category**: <ambiguity|missing-branch|wrong-default|rules-conflict|other>
 - **Reasoning**: <1-2 sentences in English>
 - **Applied changes**: <file:section> at <commit-hash> | `—`
-- **Notes** (optional, only if warnings): `verify-diff unresolved (<n> gaps)`, `verify-diff skipped (<reason>)`, `verify-diff disabled after consecutive errors`, `skill-review notes left (<n>)`, `skill-review error (<reason>)`, `skill-review disabled after consecutive errors`
+- **Notes** (optional, only if warnings): `verify-diff unresolved (<n> gaps)`, `verify-diff skipped (<reason>)`, `verify-diff disabled after consecutive errors`, `skill-review notes left after applied-edits (<n>)`, `skill-review notes left after max iters (<n>)`, `skill-review error (<reason>)`, `skill-review disabled after consecutive errors`
 
 ... repeat for each Finding in the issue ...
 
