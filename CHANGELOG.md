@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-05-02
+
+### dev-workflow v1.34.6 / dev-workflow-bundle v1.34.6
+
+- fix(dev-workflow): cover new-component alignment direction in Step 2 Simplicity self-audit (auto-triage #11)
+  - Category: missing-branch; The Step 2 Simplicity self-audit's `Cross-component structural-blast-radius` bullet only covered the "propagate fix outward" direction; the symmetric "align new component inward" branch was absent, surfacing late as Step 3 reviewer or Step 4 user pushback. Renamed to `Cross-component pattern alignment` and rewrote to audit both alignment directions explicitly, with skill-development examples kept in parentheses.
+- fix(dev-workflow): add consistency-with-siblings rationale check to Step 2 Simplicity self-audit (auto-triage #11)
+  - Category: wrong-default; Step 2 Simplicity self-audit had no branch for plan elements whose primary rationale is "align with existing sibling implementations / for consistency" alone, leaving lighter alternatives unsurfaced and divergence-cost notes implicit. Added a new bullet that triggers on this rationale, requires lighter alternatives in parallel in Decisions, and requires a one-line cost-of-divergence record when consistency is chosen.
+
 ## 2026-05-01
 
 ### dev-workflow v1.34.5 / dev-workflow-bundle v1.34.5
