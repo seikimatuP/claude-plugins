@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-05
+
+### dev-workflow v1.34.8 / dev-workflow-bundle v1.34.8
+
+- feat(dev-workflow): add user-gate summary preamble convention to Step 4 / Step 7.5 / Step 8
+  - Category: ambiguity; The three user-judgment gates presented structured content without a TL;DR layer, leaving users to scan the full structured content before forming an overall picture. Added a `§ User-gate summary preamble` section to `references/plan-format.md` and one-line references from each of the three gate steps in `SKILL.md`.
+
 ## 2026-05-03
 
 ### dev-workflow v1.34.7 / dev-workflow-bundle v1.34.7
