@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-07
+
+### dev-workflow v1.34.12 / dev-workflow-bundle v1.34.12
+
+- feat(dev-workflow): add progressive disclosure protocol for Step 4 and localization granularity for all user-facing prose
+  - Category: missing-branch; Step 4 plan approval presented the full plan body by default, requiring users to scan the entire content before forming a decision. Added `§ Progressive disclosure at user-gates` to `references/plan-format.md` defining a default output sequence (summary preamble → guidance line → section inventory) with on-demand section expansion for Step 4. Step 7.5 and Step 8 retain direct presentation (preamble + content) since violation/finding lists are typically short. Also added `§ Localization granularity` codifying the two-way translate/preserve-verbatim boundary for all user-facing prose with first-use pairing and paired bilingual samples. Updated Step 4.1 in `SKILL.md` to reference the new protocol, Step 7.5.d and Step 8.4 to reference § Localization granularity directly, and Completion to output in the resolved language. Expanded the `language` config bullet to cover preambles, section inventory, and Completion summary.
+
 ## 2026-05-06
 
 ### dev-workflow v1.34.11 / dev-workflow-bundle v1.34.11

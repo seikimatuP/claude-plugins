@@ -6,7 +6,8 @@ Read this reference when executing any of the following:
 
 - **Step 2** — creating the plan (§ Template, § Step 2 self-check)
 - **Step 3** — peer plan review (§ Step 3 (f) content-quality rubric)
-- **Step 4** — presenting the plan to the user (§ Step 4 guidance lines)
+- **Step 4** — presenting the plan to the user (§ Step 4 guidance lines, § Progressive disclosure at user-gates)
+- **Any user-facing prose output** — localization boundary (§ Localization granularity)
 
 ## Template
 
@@ -130,17 +131,35 @@ Rendering conventions for the variants below:
 
 **Decisions has one or more qualifying items (Normal or Resume):**
 
-> Please focus on the **Decisions** section below — these are the points where your judgment is actually needed. The rest has been reviewed in Step 3; skim only if something looks off.
+> Decisions has items requiring your judgment — expand to review. Other sections are available on request. The plan has been reviewed in Step 3.
 
 **Decisions is empty, Normal mode:**
 
-> No user decisions required — approve if the overall approach looks reasonable. The plan has already been reviewed in Step 3 for correctness and convention compliance.
+> No user decisions required — approve if the summary looks reasonable. Expand any section for details. The plan has been reviewed in Step 3 for correctness and convention compliance.
 
 **Decisions is empty, Resume mode (subtask execution):**
 
-> No user decisions required (subtask scoped — boundaries approved in prior Step 1.5). Approve if the detailed design within this subtask looks reasonable.
+> No user decisions required (subtask scoped — boundaries approved in prior Step 1.5). Expand any section for details.
 
 Pick exactly one variant and use its literal text verbatim — do not concatenate variants, do not reword the sentence content.
+
+## Localization granularity
+
+Applies to all user-facing prose produced by this skill — plan body content, user-gate preambles, section inventory text, violation/finding lists, Completion summary, and Step 9.5 `Description` / `Suggested fix direction` paragraphs. The resolved `language` (see `SKILL.md` § Configuration) controls the output language.
+
+**Two-way rule:**
+
+- **Translate**: generic technical concepts that have natural equivalents in the target language. The output must read naturally to a native speaker of the resolved language. Examples: primary source → 一次情報源 (`ja`), self-audit → 自己監査 (`ja`), blast radius → 影響範囲 (`ja`), edge case → 境界ケース (`ja`).
+- **Preserve verbatim**: file-internal identifiers — function names, config key names (`check_commands`, `review_iterations`), section anchors (`Step 7.5`), stable cross-reference labels (`§ No-Stall Principle`), file paths (`references/plan-format.md`), skill names (`Skill(verify-diff)`), and section headings (`Overview` / `Decisions` / `Design` / `Test plan` / `Risks` / `Unknowns`).
+
+**First-use pairing**: on the first occurrence of a translated concept within a given output block (preamble, expanded section, completion summary), pair the localized phrasing with the original technical term in parentheses (e.g. `一次情報源（primary source）` for `language: ja`). Subsequent occurrences within the same block use the localized form alone. This convention is consistent with § User-gate summary preamble's jargon pairing rule, which is a preamble-specific specialization of this broader principle — § User-gate summary preamble adds format constraints specific to preamble bullets (e.g. pairing with an identifying handle when the localized and original terms coincide under `language: en`).
+
+**Paired bilingual samples** (runtime rendering demonstration, not meta-prose):
+
+- `language: ja`: `一次情報源（primary source）の確認を経てプランを策定済み`
+- `language: en`: `Plan drafted after verifying the primary source`
+- `language: ja`: `影響範囲（blast radius）: SKILL.md の 3 セクション + references/plan-format.md`
+- `language: en`: `Blast radius: 3 sections of SKILL.md + references/plan-format.md`
 
 ## User-gate summary preamble
 
@@ -180,3 +199,21 @@ Each gate's Optional slot conditions are independent — do not import Step 8's 
 **Omission condition:**
 
 When the structured content has only one item (a single remaining violation in Step 7.5, or a single unresolved finding in Step 8), the preamble SHOULD be omitted — a 3–5 item preamble above a single concrete item is padding noise that duplicates what the item itself states. The Step 4 preamble always has ≥ 3 items by construction, so this omission does not apply to Step 4. Do not announce the omission in the user-facing output (e.g. an "preamble omitted because only one item" line) — the announcement itself is padding noise; present the single concrete item directly.
+
+## Progressive disclosure at user-gates
+
+Step 4 plan approval follows a progressive disclosure protocol: present the summary preamble and a section inventory first, then expand individual sections on user request. Step 7.5 and Step 8 do **not** use progressive disclosure — they present preamble + content directly (violations/findings lists are typically short enough to show in full).
+
+**Default output sequence (Step 4 only):**
+
+1. Summary preamble per § User-gate summary preamble
+2. Guidance line per § Step 4 guidance lines
+3. Section inventory — a list of expandable section names with item counts where applicable
+
+**Section inventory format:**
+
+`Overview / Decisions (N items) / Design / Test plan / Risks / Unknowns` — include only sections present in the plan. When Decisions has ≥ 1 qualifying item, additionally list each item's **Question** line in the inventory (one line per item, beneath `Decisions (N items)`) to surface judgment-requiring content without full section expansion.
+
+The inventory ends with a prompt in the resolved `language` inviting the user to name sections they want to expand (e.g. `確認したいセクション名を指定してください。` for `language: ja`, `Name the sections you'd like to expand.` for `language: en`).
+
+**Expansion**: when the user names a section, render that section's full content following § Localization granularity. Multiple sections may be expanded in one request. The user may also approve, reject, or request refinement without expanding any section — progressive disclosure changes the default presentation order, not the approval protocol.
