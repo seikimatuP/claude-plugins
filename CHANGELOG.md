@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-05-12
+
+### dev-workflow v1.34.17 / dev-workflow-bundle v1.34.17
+
+- fix(dev-workflow): add prose-language self-audit step in Step 4 before ExitPlanMode (auto-triage #21)
+  - Category: missing-branch; Step 4 lacked an explicit self-audit step to verify that prose output language conforms to the resolved `language` setting before calling `ExitPlanMode`. Added the self-audit requirement so the plan author catches language mismatches before the approval gate.
+- fix(dev-workflow): record class-level sweep outcome in next-iteration summary (auto-triage #21)
+  - Category: missing-branch; The next-iteration summary in Step 8 Code Review did not record the outcome of the class-level sweep, leaving the reviewer unable to distinguish "sweep ran and found nothing" from "sweep was skipped". Added explicit recording of class-level sweep result so subsequent iters have an auditable trace.
+- fix(dev-workflow): Add user-visible diagnostic when Plan Review incomplete (auto-triage #21)
+  - Category: missing-branch; When Plan Review (Step 3) ended without all findings resolved, no user-visible diagnostic was emitted — the workflow could silently advance with unresolved findings. Added a diagnostic summary when the Plan Review exits with outstanding items.
+- fix(dev-workflow): Add Premise challenge clause to Step 3 (a) Scope & feasibility (auto-triage #20)
+  - Category: missing-branch; Step 3 reviewer category (a) Scope & feasibility lacked a lens for challenging unsupported constraints, scope boundaries, and strictness levels in the Recommendation. Any constraint whose origin cannot be identified in an external requirement, known bug, or existing project rule must now be surfaced as a finding with at least one relaxed or eliminated alternative, so the plan author can populate the relevant Decisions `Alternative` field.
+- fix(dev-workflow): Add Collection-predicate boundary cases to Step 3 (c) Completeness (auto-triage #20)
+  - Category: missing-branch; Step 3 reviewer category (c) Completeness had no guidance for checking all/every and any/some predicates over per-element classification results. Vacuous-truth gaps (empty set, all-same-classification, mixed-classification) silently passed plan review. Added Collection-predicate boundary cases check requiring reviewers to trace predicates through all three boundary scenarios.
+- fix(dev-workflow): Add context-compaction recovery step to Step 1 (auto-triage #19)
+  - Category: missing-branch; When session context is compacted before Step 1 runs in the current turn, skip-condition judgments (e.g. whether `self_retrospective.feedback` is set, whether `hooks.on_complete` is configured) relied on stale cached values from the compaction summary rather than the actual merged config. Added item 8 instructing re-read of all configuration files from disk after context compaction to ensure skip conditions are evaluated against the actual config state.
+
+### extract-rules v1.13.3 / dev-workflow-bundle v1.34.17
+
+- fix(extract-rules): Add item 4 to Step C4 to skip routine pattern re-application (auto-triage #19)
+  - Category: missing-branch; Step C4 lacked guidance to distinguish user-directed design decisions from mechanical code following (symmetric duplication, template expansion, mechanical extension of an existing structure). Subagents were over-extracting patterns added without user guidance or correction. Added item 4 instructing the subagent to skip routine re-application and extract only when a new design decision was made, an exceptional case was handled, or the user explicitly corrected or redirected the approach.
+
 ## 2026-05-09
 
 ### dev-workflow v1.34.16 / dev-workflow-bundle v1.34.16
