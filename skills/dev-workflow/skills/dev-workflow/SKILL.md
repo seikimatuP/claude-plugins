@@ -16,9 +16,9 @@ allowed-tools: Agent, Read, Write, Edit, Glob, Grep, TodoWrite, EnterPlanMode, E
 
 ## Prerequisites
 
-- **Reviewer skill** (`reviewer` setting, default: ask-peer): Required for plan/code review. Supported: ask-peer, ask-claude, ask-codex, ask-gemini, ask-copilot. If the configured skill is unavailable, ask user directly instead.
-- **rules-review skill**: Required for rules compliance review (Step 7.5). If unavailable, skip Step 7.5 with message.
-- **extract-rules skill**: Required for rule update. If unavailable, skip with message.
+- **Reviewer skill** (`reviewer` setting, default: ask-peer): Required for plan/code review. Supported: ask-peer, ask-claude, ask-codex, ask-gemini, ask-copilot. If a `Skill()` call for the configured reviewer fails, attempt once more before declaring unavailable. If still unavailable: present the user with explicit fallback options (switch to another supported reviewer from the list; self-review; pause at the current gate until the skill is installed) and name the step where the reviewer call will be retried once the skill is available. Do not silently advance past a review pass without the user knowing their options.
+- **rules-review skill**: Required for rules compliance review (Step 7.5). If a `Skill(rules-review)` call fails, attempt once more before declaring unavailable. If still unavailable: skip Step 7.5 with a message that names the fallback (Step 8 reviewer as a lightweight backup) and the resume point (re-run rules-review manually after the session or re-run the workflow once the skill is installed).
+- **extract-rules skill**: Required for rule update. If a `Skill(extract-rules)` call fails, attempt once more before declaring unavailable. If still unavailable: skip Step 9 with a message that names the fallback (no rule updates this run) and the resume point (invoke extract-rules manually after the session to capture rule changes).
 
 ## Configuration
 
