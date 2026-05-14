@@ -16,7 +16,7 @@ Get a second opinion from a peer engineer (Claude subagent).
 
 ## Error Handling
 
-If a subagent dispatch fails due to a transient error (HTTP 5xx, timeout, or empty response), retry once before treating the failure as definitive. If the retry also fails, surface the failure reason to the caller — do not silently skip the review pass. Do not autonomously reroute to a different skill; the caller decides whether to substitute an alternative reviewer or proceed with self-review.
+If a subagent dispatch fails due to a transient error (HTTP 5xx, timeout, or empty response), wait 1–2 seconds, then retry once before treating the failure as definitive. For non-transient failure classes (HTTP 4xx, schema/validation errors, permission denials, etc.), fail immediately without retry — retry will not change the outcome. When the failure becomes definitive, surface the failure reason (e.g., "HTTP 503 after one retry") to the caller — do not silently skip the review pass. Do not autonomously reroute to a different skill; the caller decides whether to substitute an alternative reviewer or proceed with self-review.
 
 ## Peer Agent Personality
 
