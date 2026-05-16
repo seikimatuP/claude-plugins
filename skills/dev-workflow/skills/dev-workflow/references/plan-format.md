@@ -107,7 +107,7 @@ After the Simplicity self-audit in Step 2, run this check on the plan. Fix any f
   - A choice that passes the (a)+(b) criterion appears with no Alternative line (or no one-line rejection reason) — promote the alternative analysis into a Decisions item rather than leaving it as Design prose.
 - [ ] If executing a subtask (state file active): Decisions does not re-surface subtask-boundary questions.
 
-This is the **author's first-pass judgment** on plan content; Step 3 category (f) re-checks content externally. Structural compliance (the first bullet above) is the only structural property checked here; category (f) does not re-check it.
+This is the **author's first-pass judgment** on plan content; Step 3 category (f) re-checks content externally. The **Structural compliance** bullet above is the only structural property checked here; category (f) does not re-check it.
 
 ## Step 3 (f) content-quality rubric
 
