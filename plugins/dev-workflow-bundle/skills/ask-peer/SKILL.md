@@ -14,6 +14,10 @@ Get a second opinion from a peer engineer (Claude subagent).
 3. For parallel reviews, merge results in category order as unified feedback
 4. Present the peer's feedback to the user
 
+## Error Handling
+
+If a subagent dispatch fails due to a transient error (HTTP 5xx, timeout, or empty response), wait 1–2 seconds, then retry once before treating the failure as definitive. For non-transient failure classes (HTTP 4xx, schema/validation errors, permission denials, etc.), fail immediately without retry — retry will not change the outcome. When the failure becomes definitive, surface the failure reason (e.g., "HTTP 503 after one retry") to the caller — do not silently skip the review pass. Do not autonomously reroute to a different skill; the caller decides whether to substitute an alternative reviewer or proceed with self-review.
+
 ## Peer Agent Personality
 
 Use the following as the system instructions when spawning the subagent:
@@ -38,6 +42,9 @@ Use the following as the system instructions when spawning the subagent:
 > - Planning: scope, dependencies, risks, simpler approaches; numerical self-consistency (totals / limits / counts in the plan body re-add up under recomputation); operational reality (per-run throughput is feasible under compute and time budgets — when the plan loops over N items each costing M operations, sanity-check N × M against the run's realistic cost ceiling)
 > - Code: edge cases, error handling, test coverage, future flexibility
 > - Problem-solving: root cause analysis, questioning assumptions, alternative approaches
+>
+> **Scope boundary discipline:**
+> If the consultation request explicitly defines an in-scope boundary (e.g. "this subtask covers X, other subtasks cover Y and Z"), report findings **only for the stated in-scope items**. Missing functionality that belongs to the explicitly-listed out-of-scope areas is **not** an actionable finding — do not report it as a Critical or Major issue. When scope boundaries are not provided, apply normal judgment without restriction.
 >
 > **Output Format:**
 > - Code review → Prioritized list by severity

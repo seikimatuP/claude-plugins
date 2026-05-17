@@ -96,6 +96,9 @@ If the current subtask has no in-scope decisions, use the Resume-mode fixed sent
 
 After the Simplicity self-audit in Step 2, run this check on the plan. Fix any failures before Step 3.
 
+**Run this check in the order listed — structural compliance first, then content quality.** If the plan was seeded from a carry-over document (an inherited spec, a prior-session draft, or a hand-off note), verify structure before content: carry-over documents use free-form prose that does not match the template, and transplanting their content without first establishing the template skeleton is the most common source of non-compliant plans. Create the template skeleton first, then embed the carry-over content.
+
+- [ ] **Structural compliance**: the plan contains exactly the required sections (`Overview`, `Decisions`, `Design`, `Test plan`) in that order, with correct heading levels (`###` for top-level sections, `####` for sub-sections), and no sections outside the enumerated template (Overview, Decisions, Design, Test plan, optionally Risks / Unknowns). If this check fails, stop here and restructure before running the remaining content checks.
 - [ ] Every Decisions item passes the (a)+(b) criterion — if in doubt, drop it to Design.
 - [ ] **When Decisions renders an empty-Decisions fixed sentence** (§ Empty-Decisions fixed sentences): scan Design and Approach for any passage that answers a "why X over Y" question or introduces a fixed value, threshold, or boundary — these are (a)+(b) candidates that may have been overlooked when the author pre-judged the task as decision-free. If any surface, promote to Decisions before advancing to Step 3. Declaring "no decisions" does not discharge the buried-decisions check; it makes it more important to run.
 - [ ] No choice that qualifies under (a)+(b) is buried inside Design instead of surfaced in Decisions. **Promotion cues** — any one is sufficient to flag a Design passage as a Decisions candidate:
@@ -103,9 +106,8 @@ After the Simplicity self-audit in Step 2, run this check on the plan. Fix any f
   - The plan introduces a new enum / fixed-value set, but Decisions does not record that each member is necessary and non-overlapping with the others.
   - A choice that passes the (a)+(b) criterion appears with no Alternative line (or no one-line rejection reason) — promote the alternative analysis into a Decisions item rather than leaving it as Design prose.
 - [ ] If executing a subtask (state file active): Decisions does not re-surface subtask-boundary questions.
-- [ ] No section appears outside the enumerated template (Overview, Decisions, Design, Test plan, optionally Risks / Unknowns) — added "meta" sections such as introductions, methodology notes, or recap blocks belong inside Design or should be dropped entirely.
 
-This is the **author's first-pass judgment** on plan content; Step 3 category (f) re-checks the same material externally. The template's required-headings list defines the closed set of sections; adherence to it is the only structural property checked here, captured by the final bullet above.
+This is the **author's first-pass judgment** on plan content; Step 3 category (f) re-checks content externally. The **Structural compliance** bullet above is the only structural property checked here; category (f) does not re-check it.
 
 ## Step 3 (f) content-quality rubric
 
@@ -146,7 +148,9 @@ Pick exactly one variant and use its literal text verbatim — do not concatenat
 
 ## Localization granularity
 
-Applies to all user-facing prose produced by this skill — plan body content, user-gate preambles, violation/finding lists, Completion summary, and Step 9.5 `Description` / `Suggested fix direction` paragraphs. The resolved `language` (see `SKILL.md` § Configuration) controls the output language.
+Applies to all user-facing prose produced by this skill — plan body content, user-gate preambles, violation/finding lists, Step 10 commit-plan / per-commit gate framing prose (verbatim git output and file paths remain English), Completion summary, and Step 11.5 `Description` / `Suggested fix direction` paragraphs. The resolved `language` (see `SKILL.md` § Configuration) controls the output language.
+
+Source of truth: `SKILL.md` § Configuration `language` bullet maintains the same enumeration — keep in sync when categories are added or removed.
 
 **Two-way rule:**
 
@@ -172,7 +176,7 @@ Each user-judgment gate that presents structured content (a plan body, a remaini
 - Step 7.5 persistent-violations decision
 - Step 8 unresolved-findings decision
 
-The other user-gates listed in `SKILL.md` § No-Stall Principle (Step 1.5 dialogues, Step 7 scope-drift stop, Completion subtask PR URL prompt) do not emit a preamble — their structured content is either a single short prompt or already self-explanatory, and a 3–5 item summary above them would be padding noise.
+The other user-gates listed in `SKILL.md` § No-Stall Principle (Step 1.5 dialogues, Step 7 scope-drift stop, Step 10 commit-plan approval / per-commit accept / fold-or-defer / ambiguous-adjust clarifier gates, Completion subtask PR URL prompt) do not emit a preamble — their structured content is either a single short prompt or already self-explanatory (Step 10's gates render the commit data verbatim via `git`-shaped output), and a 3–5 item summary above them would be padding noise.
 
 **Format constraints (closed list):**
 
