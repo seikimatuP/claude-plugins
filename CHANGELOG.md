@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-18
+
+### dev-workflow v1.36.0 / dev-workflow-bundle v1.36.0
+
+- feat(dev-workflow): relax `test_commands` from fixed `["Skill(run-tests)"]` to a list-replace key (default unchanged; higher-priority config layer's list replaces lower as a whole — no item-level merge or dedup). Project config can append additional structural-check skills. Step 7 iterates the list in order; any TEST_FAILED / EXECUTION_ERROR halts the loop immediately.
+
 ## 2026-05-17
 
 ### dev-workflow v1.35.0 / dev-workflow-bundle v1.35.0
