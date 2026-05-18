@@ -1488,3 +1488,134 @@ with reason cited.
 3b. デフォルト `true` の全 user behavior change 波及（新 plan の Risk）
 ```
 （旧 / 新 が併記されると plan size 肥大 + Step 3-(N+1) reviewer が「どちらが live なのか」と困惑して再指摘）
+
+### Temporary-workaround skill integration: single hook point over state-machine weave
+**Good** (`.claude/skills/dev-workflow-triage/SKILL.md` `(f.5)` 1 段落挿入):
+```markdown
+#### (f) Scope check + stage
+（変更なし）
+
+#### (f.5) Bundle copy sync (only for bundle skill Findings)
+
+If the Finding's `target-skill` is a bundle member (`dev-workflow` / `ask-peer` /
+`extract-rules` / `rules-review`), run `cp -R skills/<name>/skills/<name>/.
+plugins/dev-workflow-bundle/skills/<name>/` to mirror canonical edits into the
+bundle copy, then `git add plugins/dev-workflow-bundle/skills/<name>/`.
+Then invoke `Skill(verify-bundle-sync)` to verify no residual drift remains;
+on `drift` / `error`, record warning and proceed to (g) (fail-open). Non-bundle
+Findings skip this entire sub-step.
+
+> Workaround for upstream Claude Code symlink bug (anthropics/claude-code#53948).
+> When symlinks return, delete this sub-step + 2 allowed-tools entries +
+> `.claude/skills/verify-bundle-sync/` directory + `.claude/dev-workflow.md`
+> test_commands entry + project.rules.md bullet.
+
+#### (g) Commit
+（変更なし）
+```
+（27 行の局所追加のみ。outer state machine / record schema / counter / TodoWrite per-Finding rows / No-Stall reminder enumeration には一切触れない）
+**Bad** (deep integration: 168 行に渡って d-loop callee として組み込み):
+```markdown
+- frontmatter allowed-tools に Skill(verify-bundle-sync) 追加
+- § No-Stall Principle の three → four propagation（L22, L24, L32, L34, L52 等）
+- § Apply accepted Findings に (d4) sub-step 挿入（branch on status, return-point reminder, consecutive-error disable counter verify_bundle_sync_disabled）
+- § Per-Finding TodoWrite items に (d4) verify-bundle-sync call row 追加
+- § Per-Finding record kept in memory に verify_bundle_sync field 追加（enum {ok, drift, error, disabled}）
+- § Step 4 Per-Finding execution log に render rule 追加 + aggregate render に verify-bundle-sync state 行
+- L116 No-summary turn / L211 disposition closed list / L249 Record-field overwrite Notes / ...
+```
+（暫定対処 skill のために 168 行の州 across 6 sections。後で削除する時に「どこを消せばいい」が読めなくなる。Step 1 で「暫定 = 削除予定」属性を察知して deep integration を early reject すべき）
+
+### Edit-induced false-positive: widen edit scope, not add detect-only check
+**Good** (root cause: `(b)` Edit が canonical のみ更新 → fix: 2-phase sync+verify で edit scope を広げる):
+```markdown
+#### (d4) Bundle copy sync + verify (only for bundle skill Findings)
+
+**Phase 1 (sync)**: `cp -R skills/<name>/skills/<name>/. plugins/dev-workflow-bundle/skills/<name>/`
+  → mirrors canonical edits into bundle copy, making (b) Edit's scope structurally complete
+**Phase 2 (verify)**: `Skill(verify-bundle-sync)` checks for residual drift
+  → `ok` = no pre-run drift remaining; `drift` = genuine pre-run drift (rare) — surface and proceed
+```
+（root cause = (b) edit が canonical のみで bundle copy 更新せず → fix = phase 1 で `cp -R` してから phase 2 で verify する 2 段構成。edit-induced drift は構造的に発生しない）
+**Bad** (detect-only + accept conflict cascade として fail-open / warning に降格):
+```markdown
+#### (d4) Skill(verify-bundle-sync) detect-only check
+
+On `drift` → Finding を `conflict` に降格、(f)/(g) skip、warning に drift パスと
+`cp -R` remediation hint。Risk #1 で cascade-conflict を「想定される失敗モード」
+として document。user が手動 `cp -R` 後に triage 再実行する運用。
+```
+（root cause の edit-scope 漏れを隠蔽。bundle skill を target とする全 Finding が cascade で conflict に降格。Critical-severity の Code Review finding を Step 8 user-gate に提示し、user が「edit範囲が問題なら適切な範囲に広げれば良い」level の question で root cause を指す形になる）
+
+### Project-local skill placement and layout
+**Good** (project-local: `.claude/skills/` 配下に flat layout):
+```text
+.claude/skills/verify-bundle-sync/
+└── SKILL.md   # frontmatter (name / description / allowed-tools)、marketplace 登録なし
+```
+そして `.claude-plugin/marketplace.json` には entry **追加せず**、CHANGELOG にも `### verify-bundle-sync` subsection を作らない。SKILL.md prose の deprecation pointer は「symlink 復活時に当 skill ディレクトリ + dev-workflow.md test_commands entry + triage (f.5) sub-step + project.rules.md bullet を一括削除」と書く（marketplace.json は言及しない）。
+**Bad** (project-local skill を marketplace + nested layout に間違えて配置):
+```text
+skills/verify-bundle-sync/skills/verify-bundle-sync/SKILL.md   # nested layout
+.claude/skills/verify-bundle-sync   # → ../../skills/verify-bundle-sync/skills/verify-bundle-sync/ (symlink)
+
+# .claude-plugin/marketplace.json
+{ "name": "verify-bundle-sync", "source": "./skills/verify-bundle-sync/skills/verify-bundle-sync", ... }
+
+# CHANGELOG.md
+### verify-bundle-sync v1.0.0
+```
+（user 訂正後、symlink 削除 + marketplace.json entry 削除 + CHANGELOG subsection 削除 + SKILL.md deprecation pointer 書き換え、の 4 箇所修正が必要になる。Step 1 difficulty assessment 時点で「このリポジトリ専用の workaround = project-local」と判定すべき）
+
+### Pre-existing layout flag vs new-change regression discrimination
+**Good** (Step 7 で test agent が pre-existing failures を flag した場合):
+```markdown
+## Step 7 結果
+
+- check_commands (jq empty): PASSED ✓
+- test_commands entry 1 (Skill(run-tests)): pre-existing structural inconsistency が報告されたが、
+  これは base-commit `f75c2a9` 時点でも存在しており、私の変更による regression ではない
+  （CLAUDE.md docs は direct-skill flat layout を推奨だが project 実態は 11 plugins
+  すべて autodiscovery nested layout — docs と実装の disconnect、本 PR scope 外）。
+  私の変更は regression を導入していない
+- test_commands entry 2 (Skill(verify-bundle-sync)): SUCCESS 確認（4 bundle skills checked, 0 drift）
+```
+（pre-existing failures を明示的に「scope 外」と切り離して reviewer に提示）
+**Bad** (pre-existing failures を「私の change が壊した」と誤帰因して修正に向かう):
+```markdown
+## Step 7 結果
+
+- test_commands で 11 plugin が TEST_FAILED → 修正します
+- まず 11 plugin それぞれの SKILL.md layout を flat に変換...
+```
+（pre-existing な docs と実装の disconnect を私の PR で「修正」しようとすると scope creep が爆発。修正前に `git stash` で変更を退避して同じ test が pre-existing で failing するか必ず確認する）
+
+### Stop-hook auto-stages unrelated files: scope each commit with `git commit -m <msg> -- <paths>`
+**Good** (Web 環境で `.claude/plans/*.md` が auto-staged された状態での per-commit):
+```bash
+# 各 commit を pathspec で scope（-m を必ず -- の前に置く、git commit -m <msg> -- <paths>）
+git commit -m "feat(dev-workflow-triage): add (f.5) Skill(verify-bundle-sync) check before commit" \
+  -- .claude/skills/dev-workflow-triage/SKILL.md
+```
+そして commit-plan proposal で:
+```markdown
+**除外（untracked だが本 PR scope 外）**:
+- `.claude/plans/*.md` (handoff / plan / 草稿)
+- `.claude/zenn-drafts/*` (記事下書き)
+
+これらは別タスクで対応。.gitignore には追加しない（team-shared な plan として残す）。
+```
+（pathspec で scope すれば stop-hook が auto-stage した unrelated files は commit に含まれない）
+**Bad** (flag order を逆にする / bulk staging に倒す):
+```bash
+# Bad 1: flag order が逆 → git が ambiguous で fail
+git commit -- .claude/skills/dev-workflow-triage/SKILL.md \
+  -m "feat(dev-workflow-triage): add (f.5) ..."
+
+# Bad 2: bulk staging で stop-hook の auto-stage 結果が混入
+git add -A
+git commit -m "feat(dev-workflow-triage): ..."
+
+# Bad 3: .claude/plans/ を .gitignore に追加 → team-shared な plan が消える
+```
+（flag order を逆にすると `git` が ambiguous で fail、bulk staging は stop-hook の干渉を取り込む、.gitignore 追加は team-shared な plan を消す。3 つとも anti-pattern）
