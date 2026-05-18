@@ -5,6 +5,7 @@ check_commands:
   - "jq empty .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json"
 test_commands:
   - "Skill(run-tests)"
+  - "Skill(verify-bundle-sync)"
 hooks:
   on_complete:
     - "Skill(skill-review)"

@@ -90,6 +90,7 @@
 - PreCompactだけでなくStopフックも検討（Compactが発生しない場合に対応）
 - 設定が複雑なスキルには README.md を用意する。`skills/<name>/README.md` に置けば direct-skill 方式で source 直下に配置されるため、利用者に自動的に届く
 - プラグイン構造を変更する場合、`.claude-plugin/marketplace.json` だけでなく検証ツール（`.claude/skills/run-tests/SKILL.md`、`.claude/commands/verify-plugins.md`）とドキュメント（`CLAUDE.md`）の該当箇所もセットで更新する。片方だけ更新すると見落としが発生する
+- bundle skills（`ask-peer` / `dev-workflow` / `extract-rules` / `rules-review`）を編集する際は、`skills/<name>/skills/<name>/`（canonical）と `plugins/dev-workflow-bundle/skills/<name>/`（bundle copy）の **両方** を同期させること。upstream symlink bug（[anthropics/claude-code#53948](https://github.com/anthropics/claude-code/issues/53948)）の暫定対応で bundle copy が実体ディレクトリのコピーになっているため、片方だけ編集すると `verify-bundle-sync` skill が drift を検出して `dev-workflow` Step 7 / `dev-workflow-triage` (d4) で FAIL する。canonical → bundle copy の同期は `cp -R skills/<name>/skills/<name>/. plugins/dev-workflow-bundle/skills/<name>/` で復旧できる。symlink に戻った時点で `verify-bundle-sync` skill ごと本ルールも削除する
 
 ## バージョン管理 / リリース運用
 
