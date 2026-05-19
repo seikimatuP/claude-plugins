@@ -33,6 +33,8 @@ Concretely, the recognized return points are the (d) `Skill(verify-diff)` empiri
 
 **(d-loop) outer iteration boundaries are non-stalling.** When `(d-loop)` (see § 3.4 Apply accepted Findings) re-enters the next outer iter (`k` → `k+1`) after `(d3)`'s return, the next tool call must directly issue iter `k+1`'s `(d)` `Skill(verify-diff)` dispatch — never an interstitial summary or "let me decide whether to continue" turn. Conversely, when the loop terminates (early-exit on zero edits, callee-abort downgrade, or `k=3` reached), the next tool call must directly issue `(f)` Scope check + stage (or skip to next Finding's `(a)` on the conflict-downgrade path). Both transitions follow the same closed-list shape as the (d)/(d2)/(d3) return-point reminders.
 
+**Workload-anxiety mid-flow abort is forbidden.** This skill has exactly three scale-management gates: (i) the 50-issue cap at § List open issues, (ii) per-callee consecutive-error disable flags (`verify_diff_disabled` / `skill_review_disabled` / `publicity_review_disabled`) that silently degrade callee coverage when consecutive non-healthy verdicts (errors, repeated `skipped` / `conflict`) accumulate, and (iii) the (d-loop) per-Finding cap (max 3 outer iters with early-exit on zero edits) that bounds outer-iter count per Finding. Aborting the routine mid-flow because cumulative `Skill()` loads "feel expensive", because the per-Finding sub-flow "looks long", or because of any equivalent operational anxiety is a No-Stall Principle violation. If you find yourself reasoning "X Findings × Y callees would consume too much context — let me stop here", that is precisely the anti-pattern this clause forbids. The scale-management gate list above is **closed**; if a future change introduces a new gate, append it here so the canonical enumeration stays exhaustive.
+
 **Fatal tool-level errors are out of scope** — irrecoverable `Edit` / `Read` / `Bash` failures halt with a diagnostic regardless.
 
 ## Triage branch isolation
@@ -208,6 +210,8 @@ Each accepted Finding runs sub-steps (a)(b)(c) once, then enters an **outer revi
 
 **Per-Finding record kept in memory for the Step 4 execution log** — alongside the existing decision + reasoning store from § Judge each Finding, also keep a small structured record per processed Finding so Step 4's Per-Finding execution log can render it. **TodoWrite is the progress UI, not a record source — it cannot be read back at runtime, so anything Step 4 needs has to be held in memory here.** **All fields are initialized to defaults on entry to (a)** so any sub-step that aborts early (e.g. (b)-Edit failure → `conflict` before (d) runs) leaves explicit defaults rather than undefined values. Defaults and update points:
 
+- `description`: default `—`. Bound at (a) entry — see § Apply accepted Findings's "Per-Finding input binding (mandatory)" paragraph for binding rules and verify-diff sourcing requirements. Internal binding only — not rendered in the Step 4 Per-Finding execution log.
+- `suggested_fix_direction`: default `—`. Bound at (a) entry — see § Apply accepted Findings's "Per-Finding input binding (mandatory)" paragraph for binding rules and verify-diff sourcing requirements. Internal binding only — not rendered in the Step 4 Per-Finding execution log.
 - `disposition`: default `accept`. Downgrade paths in (b)/(c)/(d)/(d3)/(f)/(g) overwrite it to `conflict`. Final values: `accept` / `reject` / `conflict` / `parse-error`.
 - `target`: default `—`. Set to the edit target path on (b) success.
 - `verify_diff`: default `—`. Set to status token from (d) — `converged` / `unresolved` / `skipped` / `conflict` / `disabled`.
@@ -221,7 +225,9 @@ Each accepted Finding runs sub-steps (a)(b)(c) once, then enters an **outer revi
 
 For each accepted Finding (the per-Finding memory record described above is updated **at the end of each sub-step that produces its corresponding field** — record-write points are called out inline below):
 
-- **(a) Re-read target file** — `skills/<target>/<file>`. For the first Finding this is HEAD state; for later same-file Findings it's the prior commit's result. Build `old_string` / `new_string` against this state
+- **(a) Re-read target file** — `skills/<target>/<file>`. For the first Finding this is HEAD state; for later same-file Findings it's the prior commit's result. Build `old_string` / `new_string` against this state.
+
+  **Per-Finding input binding (mandatory)**: At (a) entry — before any (b) Edit, (c) frontmatter check, or (d-loop) callee dispatch — bind `record.description` and `record.suggested_fix_direction` to the verbatim text of this Finding's `**Description:**` and `**Suggested fix direction:**` fields parsed by § Parse body. Single immutable read scoped to **this** `### Finding <n>` section. Every subsequent `Skill(verify-diff)` dispatch in the (d-loop) for this Finding MUST source its `Description` / `Suggested fix direction` arguments from `record.description` / `record.suggested_fix_direction` — never from re-reading the issue body, never from paraphrase, never from another Finding's record. Cross-Finding text contamination (e.g. using issue #M Finding K's `Description` while processing issue #N Finding L) is a Critical-severity routine bug; the binding-at-(a) discipline structurally prevents it by establishing exactly one canonical source per Finding. `publicity-review` does not take these inputs (per its `## Invocation contract`), so this binding applies only to verify-diff.
 - **(b) Apply Edit** — on failure (typically `old_string` not found because a prior Finding rewrote that region), downgrade to `conflict` and continue. **Record-write**: set `record.target = skills/<target>/<file>` on success; leave as `—` and set `record.disposition = conflict` on failure.
 - **(c) Frontmatter integrity check** — re-read the edited file; the `---` YAML block must still parse. If not: downgrade to `conflict`, run `git checkout HEAD -- <target-file>` to revert (nothing is staged yet), continue
 - **(d-loop) Outer review loop** (max 3 iterations, early-exit on zero edits or callee abort):
@@ -257,8 +263,8 @@ For each accepted Finding (the per-Finding memory record described above is upda
   **Pre-invocation reminder**: the next tool call after `Skill(verify-diff)` returns is `Skill(skill-review)` (on `converged` / `unresolved` / `skipped` — `verify-diff`'s 4-value status enum folds verdict parse failure / schema violation into `skipped`, so there is no separate orchestrator-side `error` branch here) or the next Finding's `(a)` Re-read (on `conflict`). Treat verify-diff's JSON verdict as a return value to parse, not a turn boundary — emit the parse → status branch → next dispatch as the next tool call (not as a prose summary turn between the JSON verdict and the next dispatch). See `§ No-Stall Principle`.
 
   Inputs per Finding:
-  - `Description` = Finding's `Description` field (verbatim)
-  - `Suggested fix direction` = Finding's `Suggested fix direction` field (verbatim)
+  - `Description` = `record.description` (bound at (a) per § Apply accepted Findings's "Per-Finding input binding (mandatory)" paragraph — do not re-read or paraphrase from the issue body)
+  - `Suggested fix direction` = `record.suggested_fix_direction` (bound at (a) per § Apply accepted Findings's "Per-Finding input binding (mandatory)" paragraph — do not re-read or paraphrase from the issue body)
   - `Target file` = the file edited in (b)
   - `Base ref` = `HEAD`
   - `Max iterations` = `3`
