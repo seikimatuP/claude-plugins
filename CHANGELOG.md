@@ -2,6 +2,28 @@
 
 ## 2026-05-20
 
+### dev-workflow v1.39.1 / dev-workflow-bundle v1.39.1
+
+- fix(dev-workflow): add Experimental feature gating override bullet to Step 2 Simplicity self-audit (auto-triage #35)
+  - Category: wrong-default; Step 2 § Simplicity self-audit had no bullet directing plan authors to prefer opt-in defaults when the gated feature is experimental, so sibling-consistency would push a default-enabled rollout even for unproven features. New bullet sets opt-in as the override, names experimental-marker detection signals, and states the graduation condition.
+- fix(dev-workflow): add Self-application live validation bullet to Step 2 Simplicity self-audit (auto-triage #35)
+  - Category: missing-branch; Step 2 § Simplicity self-audit had no audit item for the self-application case (target = running skill or same-run callee), so live-validation Test plan items were ad-hoc. New bullet defines self-application, requires identifying the immediate-exercise path, and mandates a "live validation" Test plan item citing the specific Step / sub-step / hook.
+- fix(dev-workflow): add Plan-vs-allowed-tools 1:1 alignment sub-check to Step 3 (a) Scope & feasibility (auto-triage #34)
+  - Category: missing-branch; Step 3 (a) had no audit cross-referencing concrete external commands cited in the plan body against the plan's allowed-tools enumeration, so missing entries surfaced as Critical rules-review violations only at Step 7.5, forcing a mid-implementation allowed-tools rewrite. New sub-check directs the reviewer to enumerate cited commands and verify 1:1 alignment.
+- fix(dev-workflow): require verbatim fenced rendering of commit body / subject / files / diff at Step 10 per-commit accept gate (auto-triage #33)
+  - Category: ambiguity; Step 10 sub-step 4.a (Present) listed the 4 elements but did not require each to render in a dedicated fenced code block, leaving room for prose-only "body 含め" summaries that hid material content from the user's approval decision. New closed-list sub-bullets specify Subject / Body / Files / Diff rendering rules (with `(no body)` placeholder for empty body) and explicitly forbid prose-only summaries.
+- fix(dev-workflow): extend Closed-list reference sweep to entire distribution surface (auto-triage #33)
+  - Category: missing-branch; Step 3 (a) "Closed-list reference sweep" only swept SKILL.md and references/*.md, missing README user-facing guides, mirrored bundle copy directories, manifest/marketplace.json plugin entries, and test/config fixtures. Sub-check now enumerates the full distribution surface with skill-development examples (README, plugins/<bundle>/skills/<name>/, .claude-plugin/marketplace.json) in parenthesized form.
+- fix(dev-workflow): add Domain-state composition explicit decomposition bullet to Step 2 Simplicity self-audit (auto-triage #32)
+  - Category: missing-branch; Step 2 § Simplicity self-audit had no audit item for feature requirements defined as composition (boolean AND/OR) of multiple independent state values; plans hid the composition behind a single derived predicate and gated on one constituent only. New bullet requires explicit enumeration of constituent values in Decisions and a state-space combination table in the Test plan.
+
+### peer v2.2.7 / dev-workflow-bundle v1.39.1
+
+- fix(ask-peer): add structural-level deep audit to Planning focus first-dispatch priority (auto-triage #34)
+  - Category: ambiguity; ask-peer's Planning focus did not require cross-reference precision, disposition vocabulary integrity, or state-variable lifecycle 4-point symmetric specification on the first review dispatch, so Critical-class structural findings surfaced at iter 2 forcing a plan rewrite and iter-count bump. New clause names the three audit items and explicitly requires them on the first dispatch.
+- fix(ask-peer): add sibling-symmetry grep audit to Planning + Code Review Focus Areas (auto-triage #32)
+  - Category: missing-branch; ask-peer's focus areas didn't require active grep + tabulation across existing components sharing label / identifier / surface text / domain concept with the new addition, so plans and diffs passed surface-level review while same-text-different-side-effect asymmetry surfaced only at integration / live-environment time. New clause directs reviewer to grep + tabulate firing conditions and side effects (mirrored to Code bullet via short cross-reference).
+
 ### dev-workflow v1.39.0 / dev-workflow-bundle v1.39.0
 
 - feat(dev-workflow): add `compact_rules` config (default `false`) gating Step 11 sub-step 3 (Char-count compaction gate). **Default: disabled** — the compaction mode added in v1.38.0 is currently experimental; set `compact_rules: true` in `.claude/dev-workflow.md` or `.claude/dev-workflow.local.md` to opt in per project. When disabled (default), `Skill(extract-rules) --compact` is never invoked, the compaction approval gate never opens, and § Completion's compaction reminder is automatically omitted. **Behavior change from v1.38.0**: users who adopted v1.38.0 compaction must explicitly set `compact_rules: true` to retain that behavior.
