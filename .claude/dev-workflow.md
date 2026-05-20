@@ -11,6 +11,7 @@ hooks:
     - "Skill(skill-review)"
     - "Skill(verify-diff)"
     - "Skill(publicity-review)"
+    - "Skill(work-complete)"
 self_retrospective:
   feedback: "SonicGarden/dev-workflow-issues"
 compact_rules: true
