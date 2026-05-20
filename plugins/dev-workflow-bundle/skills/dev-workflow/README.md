@@ -7,7 +7,7 @@ This document is the **configuration reference**. For the internal specification
 ## Overview
 
 - Orchestrator that runs development tasks through a structured process
-- Pluggable reviewer (ask-peer / ask-claude / ask-codex / ask-gemini / ask-copilot)
+- Pluggable reviewer (ask-peer / ask-claude / ask-codex / ask-gemini / ask-copilot / ask-agy)
 - Automatically adjusts review iteration count based on task difficulty
 - **Task decomposition**: Large tasks can be split into subtasks (each delivered as its own PR), with resume support across sessions
 - **Self-retrospective** (opt-in): After a run, emits a sanitized improvement signal for the bundled skills to a GitHub issue or a local markdown file — helps the skill set itself improve over time. Raw conversation never leaves the session
@@ -173,6 +173,7 @@ Skill that handles Plan Review (Step 3) and Code Review (Step 8). Choose from:
 - `ask-codex`
 - `ask-gemini`
 - `ask-copilot`
+- `ask-agy`
 
 If unset or set to an unsupported value, falls back to `ask-peer`. If the specified skill is not installed, Claude falls back to asking the user directly.
 

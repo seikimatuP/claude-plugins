@@ -1,6 +1,6 @@
 ---
 description: Test all plugin skills and agents to verify they work correctly
-allowed-tools: Bash(which *), Skill(ask-claude), Skill(ask-codex), Skill(ask-gemini), Skill(ask-copilot), Skill(ask-peer), Skill(tr), Skill(caffeinate), Skill(security-scanner), Task
+allowed-tools: Bash(which *), Skill(ask-claude), Skill(ask-codex), Skill(ask-gemini), Skill(ask-copilot), Skill(ask-agy), Skill(ask-peer), Skill(tr), Skill(caffeinate), Skill(security-scanner), Task
 ---
 
 # Test Skills and Agents
@@ -15,6 +15,7 @@ allowed-tools: Bash(which *), Skill(ask-claude), Skill(ask-codex), Skill(ask-gem
 | ask-codex | /ask-codex | - | `codex` CLI |
 | ask-gemini | /ask-gemini | - | `gemini` CLI |
 | ask-copilot | /ask-copilot | - | `copilot` CLI |
+| ask-agy | /ask-agy | - | `agy` CLI |
 | peer | /ask-peer | - | なし |
 | translate | /tr | tr, tr-hq | なし |
 | caffeinate | /caffeinate | - | macOS only |
@@ -31,6 +32,7 @@ allowed-tools: Bash(which *), Skill(ask-claude), Skill(ask-codex), Skill(ask-gem
 - `which codex`
 - `which gemini`
 - `which copilot`
+- `which agy`
 
 インストールされていないCLIに依存するスキルはスキップします。
 
@@ -56,6 +58,11 @@ allowed-tools: Bash(which *), Skill(ask-claude), Skill(ask-codex), Skill(ask-gem
 #### ask-copilot
 
 - `Skill(skill: "ask-copilot", args: "what is 2+2?")` を実行
+- CLIがインストールされていない場合はスキップ
+
+#### ask-agy
+
+- `Skill(skill: "ask-agy", args: "what is 2+2?")` を実行
 - CLIがインストールされていない場合はスキップ
 
 #### peer
@@ -105,6 +112,7 @@ allowed-tools: Bash(which *), Skill(ask-claude), Skill(ask-codex), Skill(ask-gem
 | ask-codex | /ask-codex | ✅/⚠️/N/A | ... |
 | ask-gemini | /ask-gemini | ✅/⚠️/N/A | ... |
 | ask-copilot | /ask-copilot | ✅/⚠️/N/A | ... |
+| ask-agy | /ask-agy | ✅/⚠️/N/A | ... |
 | peer | /ask-peer | ✅/⚠️ | ... |
 | translate | /tr | ✅/⚠️ | ... |
 | caffeinate | /caffeinate | ✅/⚠️ | ... |

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-20
+
+### dev-workflow v1.37.0 / dev-workflow-bundle v1.37.0
+
+- feat(dev-workflow): add `ask-agy` to the supported reviewer closed list.
+
+### ask-agy v1.0.0
+
+- New skill: `ask-agy` wraps the `agy` (Antigravity) CLI for getting a second opinion.
+
 ## 2026-05-19
 
 ### dev-workflow v1.36.2 / dev-workflow-bundle v1.36.2

@@ -10,6 +10,7 @@ Claude Code plugins for integrating with AI coding assistants.
 | ask-codex | Skill | Get a second opinion from OpenAI Codex |
 | ask-gemini | Skill | Get a second opinion from Google Gemini |
 | ask-copilot | Skill | Get a second opinion from GitHub Copilot |
+| ask-agy | Skill | Get a second opinion from Google Antigravity |
 | peer | Skill | Peer engineer for code review, planning, and brainstorming |
 | translate | Agent + Skill | AI-powered translation with /tr command (configurable quality) |
 | security-scanner | Skill | Scan plugins and skills for security risks |
@@ -25,7 +26,7 @@ Claude Code plugins for integrating with AI coding assistants.
 npx skills add hiroro-work/claude-plugins
 ```
 
-Available skills: `ask-claude`, `ask-codex`, `ask-gemini`, `ask-copilot`, `ask-peer`, `security-scanner`, `extract-rules`, `merge-rules`
+Available skills: `ask-claude`, `ask-codex`, `ask-gemini`, `ask-copilot`, `ask-agy`, `ask-peer`, `security-scanner`, `extract-rules`, `merge-rules`
 
 > Note: Agent features (translate) and hook features (caffeinate) are only available via Claude Code Plugin Marketplace.
 
@@ -44,6 +45,7 @@ Available skills: `ask-claude`, `ask-codex`, `ask-gemini`, `ask-copilot`, `ask-p
 /plugin install ask-codex@hiropon-plugins
 /plugin install ask-gemini@hiropon-plugins
 /plugin install ask-copilot@hiropon-plugins
+/plugin install ask-agy@hiropon-plugins
 /plugin install peer@hiropon-plugins
 /plugin install translate@hiropon-plugins
 /plugin install security-scanner@hiropon-plugins
@@ -58,6 +60,7 @@ Available skills: `ask-claude`, `ask-codex`, `ask-gemini`, `ask-copilot`, `ask-p
 - **ask-codex**: Requires `codex` CLI
 - **ask-gemini**: Requires `gemini` CLI
 - **ask-copilot**: Requires `copilot` CLI
+- **ask-agy**: Requires `agy` CLI
 - **peer**: No external dependencies (runs as Claude subagent)
 - **translate**: No external dependencies (runs as Claude subagent)
 - **security-scanner**: No external dependencies
@@ -67,7 +70,7 @@ Available skills: `ask-claude`, `ask-codex`, `ask-gemini`, `ask-copilot`, `ask-p
 
 ## Usage
 
-### Skill Plugins (ask-claude, ask-codex, ask-gemini, ask-copilot)
+### Skill Plugins (ask-claude, ask-codex, ask-gemini, ask-copilot, ask-agy)
 
 These plugins provide `/ask-*` commands for getting second opinions from other AI assistants.
 

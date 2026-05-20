@@ -127,7 +127,7 @@ Skill(skill: "test-skills")
 
 このスキルでは以下がテストされます：
 
-- 各スキル動作（/ask-claude, /ask-codex, /ask-gemini, /ask-copilot, /ask-peer, /tr, /caffeinate, /security-scanner）
+- 各スキル動作（/ask-claude, /ask-codex, /ask-gemini, /ask-copilot, /ask-agy, /ask-peer, /tr, /caffeinate, /security-scanner）
 - 各エージェント動作（tr, tr-hq）
 - 外部CLI依存のスキルは、CLIがインストールされていない場合スキップ
 
