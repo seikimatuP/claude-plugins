@@ -2,50 +2,26 @@
 
 ## Principles Examples
 
-### bundle スキルと dev-workflow-bundle のペア bump
-**Good**: `### dev-workflow v1.34.2 / dev-workflow-bundle v1.34.2` の対形式で CHANGELOG subsection 見出しを書く。**Bad**: `### dev-workflow v1.34.2` のみ — `dev-workflow-bundle` の対が抜けると bundle 配布 version が静かに古いまま残る。
-
-### `Edit` での marketplace.json version 書き換え
-**Good**: `old_string` に name の閉じる `"` と trailing `,` まで含める（例: `"name": "dev-workflow",` + 周辺 + `"version": "1.34.2",`）→ `version` だけ書き換え。Edit 直後に `jq empty .claude-plugin/marketplace.json` で syntax 確認、`replace_all` は禁止。**Bad**: `old_string` が `"name": "dev-workflow"` だけ → `"dev-workflow-bundle"` prefix と被って not-unique error。
-
-### bookkeeping commit の分離
-**Good** (commit log): per-Finding fix と version bump が別コミット (`fix(dev-workflow): ...` と `chore(release): bump ... (auto-triage YYYY-MM-DD)` を分離)。**Bad**: `fix(dev-workflow): ... + bump version` で混ぜると「1 accepted Finding = 1 commit」「scope check」の意味が薄れる。
+### Release bookkeeping (paired bump + marketplace.json Edit + bookkeeping commit separation)
+**Paired bump**: `### dev-workflow v1.34.2 / dev-workflow-bundle v1.34.2` の対形式で CHANGELOG subsection 見出しを書く。dev-workflow-bundle の対が抜けると bundle 配布 version が静かに古いまま残る。 **`Edit` での marketplace.json version 書き換え**: `old_string` に name の閉じる `"` と trailing `,` まで含める（例: `"name": "dev-workflow",` + 周辺 + `"version": "1.34.2",`）→ `version` だけ書き換え。Edit 直後に `jq empty .claude-plugin/marketplace.json` で syntax 確認、`replace_all` は禁止。`old_string` が `"name": "dev-workflow"` だけだと `"dev-workflow-bundle"` prefix と被って not-unique error。 **bookkeeping commit 分離**: per-Finding fix と version bump が別コミット (`fix(dev-workflow): ...` と `chore(release): bump ... (auto-triage YYYY-MM-DD)`)。混ぜると「1 accepted Finding = 1 commit」「scope check」の意味が薄れる。
 
 ### Routine スキルの per-invocation 件数 cap heuristic
 **Good**: `gh issue list --limit 50` + cap 到達時 `overflow=true` を Step 4 summary に明記。**Bad**: `--limit 200` — 1 routine 走行で順次 triage すると subagent dispatch が積み重なって walltime が膨らむ。
 
-### 0-item 経路の multi-row flip
-**Good**: 0 件 skip 時は Step 2/3/3.7/4 を **single TodoWrite call** で `completed` 一括遷移。**Bad**: phase 行ごとに別 call → call 間でターン跨ぎ停止誘惑が入る。
-
-### Forward jump pointer for skip path
-**Good**: 短絡 path 末尾に `Skipping does not bypass the reminder dispatch — apply the dispatch at the end of § Close decision.` 形式の forward jump を明示。**Bad**: `On title mismatch, skip the issue and continue.` のみ → 「skip = 何もしない」と誤読されて下流 reminder dispatch が抜ける。
-
-### 並列 reminder dispatch（runtime variant 選択）
-**Good**: issue-loop boundary に Reminder #1 (more issues remain) / Reminder #2 (last issue) を並列に prose 記述、両 variant とも closed-list `(regardless of outcome — accepted, rejected, parse-error, title-mismatch-skip, any non-error result)` + next tool call 明示 + `§ No-Stall Principle` 参照で structural 整合。**Bad**: 位置を分散すると agent が決定点で参照しにくくなる。
+### Stall mitigation patterns (collected)
+**0-item multi-row flip**: 0 件 skip 時は Step 2/3/3.7/4 を **single TodoWrite call** で `completed` 一括遷移（phase 行ごと別 call はターン跨ぎ停止誘惑）。**Forward jump pointer for skip path**: 短絡 path 末尾に `Skipping does not bypass the reminder dispatch — apply the dispatch at the end of § Close decision.` 形式の forward jump を明示（`On title mismatch, skip ... continue` のみだと「skip = 何もしない」と誤読され下流 reminder dispatch が抜ける）。**並列 reminder dispatch（runtime variant 選択）**: issue-loop boundary に Reminder #1 (more issues remain) / Reminder #2 (last issue) を並列に prose 記述、両 variant とも closed-list `(regardless of outcome — accepted, rejected, parse-error, title-mismatch-skip, any non-error result)` + next tool call 明示 + `§ No-Stall Principle` 参照で structural 整合。位置を分散すると agent が決定点で参照しにくくなる。
 
 ### `~/.claude/` 配下は Claude config root
-**Good**: `jq -r '.hooks.Stop // empty' ~/.claude/settings.json` のように `~/.claude/` 配下を直接参照可（Claude Code 標準 config root）。**Bad**: `/Users/alice/.claude/settings.json` のような特定 user の絶対パス埋め込みは配布性違反。
+**Good**: `~/.claude/` 配下直接参照可（標準 config root）。**Bad**: `/Users/alice/.claude/settings.json` のような特定 user 絶対パス埋め込みは配布性違反。
 
-### Cross-skill 構造的衝突の orchestrator + callee documenting
-**Good**: orchestrator (`dev-workflow-triage/SKILL.md`) に canonical write-up（`## Stop hook structural conflict` で Conflict mechanism + Correct behavior を full 記述）、callee (`verify-diff/SKILL.md`) は `§ Scope check boundary` 周辺に 2–3 文の short note + stable heading 参照のみ。**Bad**: callee 側で canonical を full 再記述すると orchestrator 側更新が伝播しない／冗長。
+### Cross-skill 構造的衝突 documenting + per-turn spurious feedback enumeration
+**Cross-skill conflict orchestrator + callee documenting**: orchestrator (`dev-workflow-triage/SKILL.md`) に canonical write-up（`## Stop hook structural conflict` で Conflict mechanism + Correct behavior を full 記述）、callee (`verify-diff/SKILL.md`) は `§ Scope check boundary` 周辺に 2–3 文の short note + stable heading 参照のみ。Bad: callee 側で canonical を full 再記述すると orchestrator 側更新が伝播しない／冗長。**Per-turn environment-induced spurious feedback non-fatal class enumeration**: `§ No-Stall Principle` 内で `Per-Finding/issue: comment-failed/close-failed/commit-failed` と `Per-turn (environment-induced): stop-hook spurious fire` を並列に列挙（disposition 同じだが粒度を分けて明示）。Bad: per-turn class が抜けると agent が hook フィードバックを fatal 扱いして即 commit する誤動作経路が開く。
 
-### Per-turn environment-induced spurious feedback を non-fatal class に列挙
-**Good**: `§ No-Stall Principle` 内で `Per-Finding/issue: comment-failed/close-failed/commit-failed` と `Per-turn (environment-induced): stop-hook spurious fire` を並列に列挙（disposition 同じだが粒度を分けて明示）。**Bad**: per-turn class が抜けると agent が hook フィードバックを fatal 扱いして即 commit する誤動作経路が開く。
+### Callee-side fenced JSON return contract for stall-prone sub-skills (+ orchestrator parse-failure handling)
+**Good (callee side)**: callee SKILL.md 末尾に `## Return contract` 節 + 単一 fenced JSON block (`{"status": "no-actionable-findings"|"applied-edits"|"notes-left"|"error", "applied_edits_count": <int>, "notes_remaining_count": <int>, "reason": "..."}`) を必須化、caller が parse して `record.skill_review` にマップ。Bad: free-form prose checklist のみ → turn 全体を消費して return-point reminder では救えず stall。 **Orchestrator counterpart**: (d2) で末尾 JSON を parse し `no-actionable-findings`/`applied-edits`/`notes-left`/`error`/parse-failure を mapping table で `record.<callee>` に変換、`error`/parse-failure は loop terminate / no retry / error counter increment。`judge the result and proceed` 一行だと callee contract 破綻時 orchestrator が無限 loop か沈黙落ち。
 
-### Callee-side fenced JSON return contract for stall-prone sub-skills
-**Good**: callee SKILL.md 末尾に `## Return contract` 節 + 単一 fenced JSON block (`{"status": "no-actionable-findings"|"applied-edits"|"notes-left"|"error", "applied_edits_count": <int>, "notes_remaining_count": <int>, "reason": "..."}`) を必須化、caller が parse して `record.skill_review` にマップ。**Bad**: free-form prose checklist のみ → turn 全体を消費して return-point reminder では救えず stall。
-
-### Orchestrator-side verdict parse-failure handling
-**See pattern**: `### Callee-side fenced JSON return contract for stall-prone sub-skills` — orchestrator counterpart: (d2) で末尾 JSON を parse し `no-actionable-findings`/`applied-edits`/`notes-left`/`error`/parse-failure を mapping table で `record.<callee>` に変換、`error`/parse-failure は loop terminate / no retry / error counter increment。`judge the result and proceed` 一行だと callee contract 破綻時 orchestrator が無限 loop か沈黙落ち。
-
-### bundle 内 review 系スキルの Pattern A 統一
-**Good**: review walk は fresh subagent で実行（Pattern A — `verify-diff` / `rules-review` と同形）、Edit application は main thread に残して reviewer を bias-free に保つ。non-interactive routine 呼び出しを想定し prompt しない。**Bad**: main thread inline 実行は bias-free executor 不在 + review prose が main context に積もる + bundle 内 design pattern 乖離。
-
-### Standalone interactive-only path の deprecate
-**Good**: structural change は常に `notes_remaining_count` に集計し apply しない（caller が verdict + notes を見て判断、skill 自身は user-confirm dialogue を持たない）。**Bad**: `Confirm with the user first ... When invoked as a sub-skill, do not wait` のような mode 分岐 — live caller が両方 sub-skill mode で interactive path 到達不能の silent dead-code（caller 側で mode を渡す術もない）。
-
-### Agent unavailable fallback の cross-reference 圧縮
-**Good**: canonical write-up へポインタ + 1 行 specialization のみ（例: `**Agent unavailable fallback**: detect availability and fall back per the canonical write-up in rules-review SKILL.md § 5. Review ...`、skill-review specialization は fenced JSON 共通化のみ 1 行追加）。**Bad**: 毎回 3 段落 inline で書き直す → canonical 更新が他 callee に伝播しない / 冗長。
+### Pattern A unification + standalone interactive-path deprecate + fallback cross-ref compression
+**Pattern A unification**: review walk は fresh subagent で実行（Pattern A — `verify-diff` / `rules-review` と同形）、Edit application は main thread に残して reviewer を bias-free に保つ。non-interactive routine 呼び出しを想定し prompt しない。Bad: main thread inline 実行は bias-free executor 不在 + review prose が main context に積もる + bundle 内 design pattern 乖離。 **Standalone interactive-only path deprecate**: structural change は常に `notes_remaining_count` に集計し apply しない（caller が verdict + notes を見て判断、skill 自身は user-confirm dialogue を持たない）。Bad: `Confirm with the user first ... When invoked as a sub-skill, do not wait` 分岐 — live caller が両方 sub-skill mode で interactive path 到達不能の silent dead-code。 **Agent unavailable fallback cross-ref compression**: canonical write-up へポインタ + 1 行 specialization のみ（例: `**Agent unavailable fallback**: detect availability and fall back per the canonical write-up in rules-review SKILL.md § 5. Review ...`）。Bad: 毎回 3 段落 inline で書き直す → canonical 更新が他 callee に伝播しない。
 
 ### `--- LABEL ---` fence convention for Pattern A dispatch prompts
 **Good**: dispatch prompt を `--- BEST PRACTICES CHECKLIST ---` / `--- CHANGED FILES ---` / `--- REVIEWER PROMPT ---` / `--- RESPONSE FORMAT ---` のような `--- LABEL ---` fence で区切る（`verify-diff` Step 3 (a) 由来）。**Bad**: ad-hoc な `## Sub-heading` 方式は subagent 側で section 終端境界が曖昧 + bundle 内流儀が揃わない。
@@ -62,11 +38,8 @@
 ### Aggregate counter warning string differentiation
 **Good**: 同 `notes_remaining_count` でも sub-condition 違いで warning 文字列を differentiate (`skill-review notes left after applied-edits (3)` / `skill-review notes left after max iters (1)`)、SKILL.md にも区別意図を 1 行明記。**Bad**: `skill-review notes left (3)` / `(1)` の同一文字列集約 → user が sub-source を identify できず原因切り分け不能。
 
-### CHANGELOG entry での過去 commit 参照
-**Good**: 過去 commit 参照は `auto-triage #6` 形式で既存 entry スタイルと一貫させる。**Bad**: 生の commit hash (`fcf70b2` 等) を埋めると repo の reword / rebase で安定性が下がる + 既存 entry の `auto-triage #N` 参照スタイルから外れる。
-
-### CHANGELOG `Category:` token の closed taxonomy
-**Good**: `Category:` token は closed list（`missing-branch` / `ambiguity` / `wrong-default`）から選択。新 failure mode は既存 3 種にマップ可能か再検討（例: 「default 値が skill-bundle internal だった」= `wrong-default`）。**Bad**: `distribution-leak` / `scope-leak` のような新規記述的 token 発明は taxonomy 一貫性が崩れる。
+### CHANGELOG conventions (commit ref form + Category closed taxonomy)
+**Past commit reference**: `auto-triage #6` 形式で既存 entry スタイルと一貫させる。生の commit hash (`fcf70b2` 等) は reword / rebase で安定性低下 + 既存 entry スタイルから外れる。 **`Category:` token closed taxonomy**: closed list（`missing-branch` / `ambiguity` / `wrong-default`）から選択。新 failure mode は既存 3 種にマップ可能か再検討（例: 「default 値が skill-bundle internal だった」= `wrong-default`）。`distribution-leak` / `scope-leak` のような新規記述的 token 発明は taxonomy 一貫性が崩れる。
 
 ### bundle skill SKILL.md prose のメタ文脈語彙汎化
 **Good**: 主文に抽象原理（`shared base classes, cross-cutting middleware, return/API contracts, mirrored services, parallel route handlers`）を書き、skill 開発文脈の具体例（`subagent dispatch shape, hook wiring, state-file handling, return-contract design`）は括弧書きで添える。**Bad**: 適用文脈固定の語彙を主文に直接埋めると、bundle skill を skill 開発以外で利用する読者に読み解きづらい。
@@ -83,17 +56,8 @@
 ### orchestrator render の `<max_iterations>` ハードコード
 **Good**: orchestrator が callee ごとに渡す max iter 値を denominator にハードコード（`verify_diff: [iter <iterations_used>/3]`, `publicity_review: [iter <iterations_used>/2]`）。**Bad**: `<max_iterations>` プレースホルダのままだと caller がどの値を渡しているか読めず、複数 callee で異なる max を使う場合 denominator がブレる。
 
-### Mode determination の 3 分岐契約 (all/none/partial)
-**Good**: All-present → explicit-args mode、All-absent → auto-derive mode、Partial (1〜N-1) → early return with `{"mode":"explicit-args","status":"error","reason":"incomplete args"}` (silent fallback せず loud bug signal)。**Bad**: 「1 つ以上指定で explicit-args、空で auto-derive」 → caller のテンプレ書き間違いが silent に通って後追いで mode 判別不能。
-
-### Pattern A iter loop の inferred-state iter-1 fixing
-**Good**: `inferred_intent` のような毎 iter 再推論される値は iter 1 verdict から main-thread context に capture して per-skill loop 中固定 (iter 2+ 値で上書きしない、divergence 比較から除外、iter 1 verdict なし経路は `null`)。**Bad**: 毎 iter 上書きすると per-target verdict が「単一の安定した推論値」を報告できず、divergence 比較が noisy で収束しない。
-
-### Mode-specific empty-input disposition
-**Good**: caller framing がある explicit-args では empty-diff = `conflict` (bug signal)、無い auto-derive では empty-diff = `skipped` (informational)。**Bad**: mode 区別せず一律 `conflict` だと auto-derive で「空 = bug」と断定する根拠がない。
-
-### Mode-additive status enum extension
-**Good**: 新 mode が追加した status 値は「mode-only」と明記 (`partial` is **auto-derive-only** and is never emitted by the explicit-args mode contract)、既存 caller の 4-value enum 互換性を契約として守る。**Bad**: 全 mode で 5-value 列挙すると既存 caller の switch 文が `partial` を取りこぼし dead code path で沈黙落ち。
+### Mode determination + iter-state fixing + empty-input disposition + status enum extension (collected)
+**Mode determination 3 分岐契約**: All-present → explicit-args mode、All-absent → auto-derive mode、Partial (1〜N-1) → early return with `{"mode":"explicit-args","status":"error","reason":"incomplete args"}` (silent fallback せず loud bug signal)。「1 つ以上指定で explicit-args、空で auto-derive」は caller テンプレ書き間違いが silent 通過。 **inferred-state iter-1 fixing**: `inferred_intent` 等毎 iter 再推論値は iter 1 verdict から main-thread context に capture して per-skill loop 中固定 (iter 2+ 上書き禁止、divergence 比較除外、iter 1 verdict なし経路は `null`)。毎 iter 上書きは divergence 比較が noisy で収束しない。 **Mode-specific empty-input disposition**: caller framing ある explicit-args では empty-diff = `conflict` (bug signal)、無い auto-derive では empty-diff = `skipped` (informational)。mode 区別せず一律 `conflict` だと auto-derive で「空 = bug」断定根拠なし。 **Mode-additive status enum extension**: 新 mode 追加 status 値は「mode-only」明記 (`partial` is auto-derive-only)、既存 caller の N-value enum 互換性契約として守る。全 mode で N+1-value 列挙だと既存 caller switch が新値を取りこぼし dead code path で沈黙落ち。
 
 ### Multi-target safety-rail の pre-check before global revert
 **Good**: per-Edit pre-check で `out_of_scope` path を skip（実 write 無し → revert 不要）、`reverted_paths` は informational only。**Bad**: write 後に global `git checkout HEAD -- <sibling-path>` で revert すると、multi-target loop で T1 executor が T2 path に edit を返した場合 T2 で既に landed した sibling edits を wipe する collateral damage 経路が開く。
@@ -116,14 +80,8 @@
 
 ## Project-specific Patterns Examples
 
-### `jq` の `null` 文字列フォールバック
-**Good**: filter 内 `// "unknown"` + post-pipeline `-z` ガードの 2 段構え (`producer_version=$(jq -r '(.plugins[] | select(.name == "<n>") | .version) // "unknown"' file 2>/dev/null); [ -z "$producer_version" ] && producer_version="unknown"`)。**Bad**: `jq ... || echo unknown` のみ — entry 不在時 `jq` は literal `null\n` を zero exit で出すため `||` 不発火、文字列 `"null"` が下流に流れる。
-
-### detached HEAD ガード
-**Good**: Pre-flight で `git symbolic-ref -q HEAD >/dev/null` non-zero exit を以って detached HEAD を early detect、abort で理由を summary に出す。**Bad**: `git rev-parse --abbrev-ref HEAD` だと detached HEAD で `HEAD` literal を返し、後段 `git switch "$original_branch"` が「HEAD という名前のブランチ」を探して fail。
-
-### `refs/heads/<glob>` の single-quote
-**Good**: `git for-each-ref --sort=-refname 'refs/heads/triage-*' --format='...'` で single-quote。**Bad**: unquoted `refs/heads/triage-*` だと zsh の `nomatch` option がマッチ無し時に shell abort、`zsh: no matches found` で routine が silent halt。
+### Shell/git pre-flight gotchas (jq null + detached HEAD + refs glob quoting)
+**`jq` null 文字列 fallback**: filter 内 `// "unknown"` + post-pipeline `-z` ガードの 2 段構え (`producer_version=$(jq -r '...) // "unknown"' file 2>/dev/null); [ -z "$producer_version" ] && producer_version="unknown"`)。`jq ... || echo unknown` のみだと entry 不在時 literal `null\n` を zero exit で出すため `||` 不発火、文字列 `"null"` 流出。 **detached HEAD ガード**: Pre-flight で `git symbolic-ref -q HEAD >/dev/null` non-zero exit を以って detached HEAD を early detect。`git rev-parse --abbrev-ref HEAD` だと detached HEAD で `HEAD` literal を返し、後段 `git switch "$original_branch"` が「HEAD という名前のブランチ」を探して fail。 **`refs/heads/<glob>` single-quote**: `git for-each-ref --sort=-refname 'refs/heads/triage-*'` で single-quote。unquoted だと zsh の `nomatch` option がマッチ無し時に shell abort、routine が silent halt。
 
 ### Run-level invariant の Pre-flight への hoist
 **Good**: per-loop iteration で繰り返し resolve する不変量（`current_version` from marketplace.json、`changelog_content` from CHANGELOG.md 等）は Step 1 Pre-flight に hoist して 1 回だけ resolve / Read、loop 内では cached value を参照。**Bad**: per-Finding loop 内で毎回 jq / Read すると N×M で累積、Simplify 段階で頻出 fix。
@@ -131,11 +89,8 @@
 ### disposition enum 拡張ではなく既存 enum の厳格化
 **Good**: 既存 reject criterion #1「Already addressed」を **2-leg AND test** で具体化（(i) CHANGELOG 該当 entry あり AND (ii) 現 SKILL.md で再現せず、両方 cited、片方でも doubt なら fall-through）、新 disposition value は追加しない。**Bad**: 新 disposition value (`already-addressed-version` 等) を発明 → downstream parser / mapping table / status enum 全部 update + 後方互換性も崩れる。
 
-### counter 増分は「zero exit only / 失敗 path には without incrementing 明記」
-**Good**: 成功 (`Zero exit: increment ... by 1`) / 失敗 (`Non-zero exit: record ...-failed. **Do not increment ...**`) 両分岐で increment 命令を **symmetric に明示**。**Bad**: 失敗側で increment 命令を省略すると「省略 = increment しない / 暗黙 increment」が両解釈可能で bistability。
-
-### dead flag よりも単一 counter で cleanup 条件を表現
-**Good**: counter 単独で cleanup 条件を判定（`If triage_commit_count == 0 and bookkeeping_skipped, run auto-cleanup`）。**Bad**: `triage_branch_active` のような boolean flag + counter の合成 — fatal abort path は判定 path を通らないため flag が判定に寄与せず dead flag になる（Code Review iter 1 の「dead flag drop」finding パターン）。
+### Counter discipline (zero-exit-only increment symmetric / single-counter over dead flag)
+**Symmetric increment命令**: 成功 (`Zero exit: increment ... by 1`) / 失敗 (`Non-zero exit: record ...-failed. **Do not increment ...**`) 両分岐で symmetric 明示。失敗側省略は「省略 = increment しない / 暗黙 increment」両解釈で bistability。 **Dead flag vs single counter**: counter 単独で cleanup 条件判定（`If triage_commit_count == 0 and bookkeeping_skipped, run auto-cleanup`）。`triage_branch_active` のような boolean flag + counter 合成は fatal abort path で判定 path 通らず dead flag になる。
 
 ### Run-level 失敗系は per-Finding edge-case 表に混ぜない
 **Good**: SKILL.md Pre-flight 節に Run-level failure (`branch creation failed` / `detached HEAD` 等) を手続き的に記述、`references/triage-criteria.md` Edge-case 表は per-Finding loop 内 case (`marketplace.json 不在` / `Finding 文字列 malformed` 等) のみ。**Bad**: 同 Edge-case 表に混在させると Run-level / per-Finding semantics scope が混ざり読み手の判断が曖昧。
@@ -155,11 +110,8 @@
 ### Sequential N-callee orchestration を 1 Agent dispatch に集約
 **Good**: per-Finding で連続する `Skill(callee-A) → Skill(callee-B) → Skill(callee-C)` を 1 個の `Agent` (subagent_type: general-purpose) dispatch にまとめ、aggregate JSON (`status` ∈ {`ok`, `callee-abort`, `error`}, `outer_iter`, `outer_exit`, plus nested per-callee return fields) を返す。orchestrator stall surface を N→1 に削減、subagent prompt で「**Do not run further `Skill()` dispatches beyond the enumerated**」を明示。**Bad**: sequential `Skill()` 直呼びは N decision points 各が JSON-echo turn-end stall opportunity 化、reminder 系 prose discipline は diminishing returns。
 
-### Bold-prose label cross-reference style
-**Good**: bold-prose label を参照する場合 `§ <Heading>'s "<bold label>" paragraph` 形式で bold 内文言を verbatim で囲み込む（例: `§ Apply accepted Findings's "Per-Finding record kept in memory" paragraph`）。**Bad**: 存在しない heading に dangling reference (`§ Apply accepted Findings record schema`) — Code Review Major finding として上がる。
-
-### Sibling enum field の symmetric extension audit
-**Good**: 並列 sibling enum (`record.verify_diff` / `record.skill_review` / `record.publicity_review` 等) に新値（例: `error`）を追加する場合、全 sibling に **symmetric に追加**、aggregate render の switch 文も全 enum を網羅。**Bad**: 片側だけ asymmetric に拡張すると aggregate render で取りこぼし（Code Review iter 2 / iter 3 の class-level extension audit で finding 化）。
+### Cross-reference and sibling extension discipline (bold-prose ref + sibling enum symmetric audit)
+**Bold-prose label cross-reference**: bold-prose label 参照は `§ <Heading>'s "<bold label>" paragraph` 形式で bold 内文言を verbatim 囲み込む。存在しない heading への dangling reference は Code Review Major finding。 **Sibling enum symmetric extension**: 並列 sibling enum (`record.verify_diff` / `record.skill_review` / `record.publicity_review` 等) に新値追加時は全 sibling に symmetric 追加、aggregate render switch も全 enum 網羅。片側 asymmetric 拡張は aggregate render で取りこぼし。
 
 ### Plan rewrite triggered by user material change at Step 4 gate
 **Good**: user material change 後の plan は 1 pass で end-to-end rewrite — Title から旧 approach 由来語句削除、Context / Goal / Approach 全置換、Decisions の Recommendation/Alternative を swap (user 既選択を Recommendation に annotation 付き)、Risks は新 approach 固有 unknowns に完全置換、Step 3-(N+1) で再 review iter してから ExitPlanMode 再提示。**Bad**: 旧記述を残したまま新記述を併記すると plan size が肥大化、Step 3-(N+1) reviewer に「buried decisions / scope creep」と再指摘される。
@@ -196,11 +148,8 @@
 ### Step renumbering propagation (Generic rule + Individual overrides)
 **Good**: Plan の Design 節で 2 階層に記述 — (i) Generic rule (mechanical sweep): 旧 Step N → 新 Step M の単純置換が安全な参照を列挙、(ii) Individual overrides (mechanical sweep を適用しない): 旧 `Runs after Step 9` が新番号で当該 hook 自体が Step 9 になる等の semantic 誤りを避ける line 別 override、line 番号は pre-edit reference 明記。**Bad**: 全部 mechanical sweep だと `on_complete: Runs after Step 9` が `Runs after Step 11` に上書きされ意味的誤り。
 
-### TodoWrite single-row for unknown sub-iteration count
-**Good**: sub-iteration count が user-approval input に依存する Step（Interactive Commits 等）は per-iteration row に展開せず **single row のまま登録**、annotation で「count is not known until the proposal phase」と明示。**Bad**: per-commit row (`Step 10-1` ... `Step 10-N`) 展開は N 未確定で registration 不能、mid-flight 書き換えで stall surface が増える。
-
-### Behavior-change default-flip → CHANGELOG opt-out note + downstream automation visibility
-**Good**: CHANGELOG entry 冒頭に **opt-out 手順を loud に表記** (`**Default: enabled** — set <flag>: <old-default> in <config-path> to opt out`)、Risks 節 / CHANGELOG note に **downstream automation 注意喚起** (minor bump では signal 強度不足の可能性、CHANGELOG note で visibility 確保)。**Bad**: minor bump 単独だと default flip が entry から読み取れず、CHANGELOG を読まない自動 update CI で silent breakage。
+### TodoWrite single-row for unknown sub-iter count + CHANGELOG opt-out note for default-flip
+**TodoWrite single-row**: sub-iteration count が user-approval input に依存する Step は per-iteration row 展開せず single row 登録、annotation で「count is not known until the proposal phase」明示。per-commit row 展開は N 未確定で registration 不能 + mid-flight 書き換えで stall surface 増。 **Default-flip CHANGELOG opt-out note**: CHANGELOG entry 冒頭に opt-out 手順を loud 表記 (`**Default: enabled** — set <flag>: <old-default> in <config-path> to opt out`)、Risks / CHANGELOG note に downstream automation 注意喚起。minor bump 単独だと default flip 読み取れず自動 update CI で silent breakage。
 
 ### Multi-form gate vocabulary disambiguation in § No-Stall Principle
 **Good**: 各 gate を別 bullet で列挙し vocabulary を明示分離 — commit-plan approval / per-commit accept (accept/adjust/cancel) / fold-or-defer (binary classifier `fold`/`defer`/`cancel`、per-commit accept enum とは区別) / ambiguous-adjust clarifier。各 gate の canonical token classifier を `§ Step <N>'s "<paragraph label>" paragraph` で参照。**Bad**: 1 bullet merge は fold/defer binary semantics と accept/adjust/cancel 4 値 enum が conflate して取り違え。
@@ -210,10 +159,8 @@
 
 **See pattern**: `### \`git status --porcelain=v1 --untracked-files=all -z\` canonical pattern` — companion: `git diff <base-commit>` omits untracked files by design; use `Read` for new-file hunk and mark untracked-vs-modified explicitly in UI.
 
-### Counter lifecycle: zero-exit-only increment + amend exclusion
-**Good**: counter (`landed_count` / `triage_commit_count` 等) の 4 点 explicit — (i) loop 開始 0 初期化、(ii) landing zero exit で +1、(iii) retry / abort / commit-failed 経路は increment しない、(iv) `--amend` で同 logical commit を更新した場合は再 increment しない。SKILL.md に `On zero exit, increment ... by 1` / `The amend re-commits the same logical commit — ... is not re-incremented` を symmetric に明示。**Bad**: 増分条件が ambiguous だと downstream routing の bistability 崩壊。
-
-**See pattern**: `### Counter lifecycle: zero-exit-only increment + amend exclusion` — companion: downstream routing は config-flag intent (`interactive_commits: true`) ではなく **actual counter** (`landed_count > 0`) で分岐すべき。flag は「やる予定」、counter は「実際に起きた」。flag 判定だと `enabled-but-skipped` case を「already committed」branch に mis-route する silent regression。
+### Counter lifecycle: zero-exit-only increment + amend exclusion (+ downstream actuality routing)
+**Lifecycle (4 点 explicit)**: (i) loop 開始 0 初期化、(ii) landing zero exit で +1、(iii) retry / abort / commit-failed 経路は increment しない、(iv) `--amend` で同 logical commit 更新時も再 increment しない。SKILL.md に `On zero exit, increment ... by 1` / `The amend re-commits the same logical commit — ... is not re-incremented` を symmetric 明示。増分条件 ambiguous だと downstream routing bistability 崩壊。 **Downstream actuality routing**: routing は config-flag intent (`interactive_commits: true`) ではなく actual counter (`landed_count > 0`) で分岐。flag は「やる予定」、counter は「実際に起きた」。flag 判定だと `enabled-but-skipped` を「already committed」branch に mis-route する silent regression。
 
 ### 2-stage grep audit for cross-file Step renumbering
 **Good**: 2 段 grep — (1) phrase-pair-only grep（旧 section heading 句の OR）で 0 hit 確認、(2) word-boundary grep on bare numbers で残り hit を目視確認（新番号 semantics 下の正規参照は OK / 誤って旧番号のまま残った参照は flag）。line 番号は pre-edit reference、最終確認は phrase / heading anchor。**Bad**: broad grep のみ (`grep -rn "Step 9"`) だと旧 heading 残骸と新正規参照が両方 hit し切り分け不能。
@@ -229,31 +176,14 @@
 ### Edit-induced false-positive: widen edit scope, not add detect-only check
 **Good**: verification skill が N 個全てで持続 fail する場合、root cause は edit operation の scope が incomplete → **edit 側の scope を適切に広げる**（例: canonical edit 直後に `cp -R` で bundle copy へ sync する phase を追加、phase 1 sync → phase 2 verify の 2 段構成）。**Bad**: verification を fail-open / warning に降格 / detect-only + accept conflict cascade — root cause の edit-scope 漏れを隠蔽。auto-apply で fail-open に倒さず Step 8 user-gate で判断を仰ぐ。
 
-### Project-local skill placement and layout
-**Good**: project-local skill は `.claude/skills/<name>/SKILL.md` **flat layout** 配置、`marketplace.json` 登録なし / CHANGELOG entry なし、SKILL.md prose の deprecation pointer に「symlink 復活時の削除手順」を明記（marketplace.json は言及しない）。Step 1 difficulty assessment 時点で project-local 判定。**Bad**: nested layout + marketplace 登録だと訂正後 symlink / marketplace entry / CHANGELOG subsection / SKILL.md pointer の 4 箇所修正が必要。
-
-### Globally-exposed project-local skill: relative symlink under `~/.claude/skills/<name>`
-**Good**: `ln -s ../../Sources/github.com/<owner>/<repo>/.claude/skills/<name> ~/.claude/skills/<name>` で **relative path** symlink を張る（既存 `~/.claude/skills/*` の `../../.agents/skills/...` convention と同じ relative form）。SKILL.md prose では「exposed globally via a `~/.claude/skills/<name>` symlink」と書くのみで absolute path を例示しない。**Bad**: `ln -s /Users/<name>/Sources/.../.claude/skills/<name> ~/.claude/skills/<name>` のような absolute path だと repo を後で `mv` / rename したとき symlink が dangling になる + SKILL.md に absolute path を例示するとコピペで absolute 形が増殖する。
-
-### `Read`-then-`Write` skills: drop `test -f` / `test -d` pre-checks (TOCTOU anti-pattern)
-**Good**: `Read .claude/<config>.local.md` を直接呼び、Read error を "unconfigured / missing" の停止条件として扱う。`allowed-tools: Read, Write` のみで `Bash(test *)` を含めない。**Bad**: `Bash(test -f .claude/<config>.local.md)` → 成功なら `Read` という二段構えだと (i) TOCTOU anti-pattern（pre-check と Read の間に file が消える / 現れる）、(ii) Read 自体が missing error を出すため pre-check は重複、(iii) `allowed-tools` に `Bash(test *)` を残すことになり permission surface が広がる。
-
-### Setup-mode pre-existence re-check (defensive race guard)
-**Good**: Setup-mode procedure に `Before writing: re-confirm \`.claude/<config>.local.md\` does not exist (defensive guard against a race where it appeared between Step 1 and here). If it now exists, abort Setup mode and report the conflict — never overwrite` を明示。**Bad**: Step 1 で「不在を確認 → Setup-mode 入る」決定後、Setup-mode 末尾で確認せずに `Write` するロジックだと、同一 invocation 内で並行 session / sibling tool が間に config を作成した場合に既存 file を clobber する破壊経路が開く。
-
-### `Read` error semantics: default to stop-with-error, not Setup mode, when missing-vs-other not distinguishable
-**Good**: SKILL.md prose に `On Read error: enter § Setup mode (config missing) **only** when the file does not exist. For any other Read error (permission, encoding, etc.) stop with an error reporting the path — do not enter Setup mode, since the existing file would be clobbered. If the \`Read\` tool's error does not distinguish missing-vs-other reliably, default to stop-with-error` と明示。**Bad**: `On Read error: enter Setup mode` の一段分岐だと permission denied / encoding error を「不在」と誤分類して既存 config を template で上書きする。
-
-### Project-local skill self-description canonical phrasing
-**Good**: 冒頭で ``Append a single task line to an Obsidian Vault's `inbox.md`. This is a **project-local** skill (lives under `.claude/skills/inbox-add/`, not registered in `.claude-plugin/marketplace.json`) and is exposed globally via a `~/.claude/skills/inbox-add` symlink.`` のように sibling skill (`triage-review` / `verify-bundle-sync`) と punctuation まで mirror した形で self-describe。**Bad**: 「This skill is project-local. It lives under .claude/skills/. It is not in marketplace.json.」のように prose 形で散らすと sibling と house-style が揃わず Reuse review で finding になる。
+### Project-local skill discipline (placement + global symlink + Read/Write safety + self-description)
+**Placement & layout**: `.claude/skills/<name>/SKILL.md` flat layout、`marketplace.json` 登録なし / CHANGELOG entry なし、SKILL.md prose の deprecation pointer に「symlink 復活時の削除手順」を明記。nested layout + marketplace 登録だと symlink / marketplace entry / CHANGELOG subsection / SKILL.md pointer の 4 箇所修正が必要。 **Globally-exposed via relative symlink**: `ln -s ../../Sources/github.com/<owner>/<repo>/.claude/skills/<name> ~/.claude/skills/<name>` で relative path symlink（既存 `~/.claude/skills/*` の `../../.agents/skills/...` convention と同 relative form）。SKILL.md prose は「exposed globally via a `~/.claude/skills/<name>` symlink」のみで absolute path を例示しない（absolute path だと repo `mv` / rename で dangling + コピペで absolute 形増殖）。 **`Read`-then-`Write` TOCTOU avoidance (drop `test -f` / `test -d` pre-checks)**: `Read .claude/<config>.local.md` を直接呼び、Read error を "unconfigured / missing" の停止条件として扱う。`allowed-tools: Read, Write` のみで `Bash(test *)` を含めない。pre-check 二段構えは (i) TOCTOU anti-pattern、(ii) Read 自体が missing error、(iii) permission surface 拡大。 **Setup-mode pre-existence re-check (defensive race guard)**: Setup-mode procedure に `Before writing: re-confirm \`.claude/<config>.local.md\` does not exist ... If it now exists, abort Setup mode ... never overwrite` 明示。Step 1 で不在確認 → Setup-mode 入る決定後、末尾で再確認せず `Write` だと並行 session が間に config 作成した case で clobber。 **`Read` error semantics: default stop-with-error**: `On Read error: enter Setup mode only when the file does not exist. For any other Read error ... stop with an error ... If the Read tool's error does not distinguish missing-vs-other reliably, default to stop-with-error`。一段分岐だと permission denied / encoding error を「不在」誤分類で既存 config を template 上書き。 **Self-description canonical phrasing**: ``This is a **project-local** skill (lives under `.claude/skills/<name>/`, not registered in `.claude-plugin/marketplace.json`)`` のように sibling skill と punctuation まで mirror。prose 形で散らすと house-style 不揃いで Reuse review finding。
 
 ### Pre-existing layout flag vs new-change regression discrimination
 **Good**: Step 7 で test agent が failures flag した場合、`git stash` で変更退避 / base commit で同 test 再実行して pre-existing か discriminate、pre-existing なら Step 8 で reviewer に「pre-existing failures (out of scope of this PR), no new regression」と明記。**Bad**: pre-existing failures を「私の change が壊した」と誤帰因して修正に向かうと scope creep が爆発。
 
-### Callee-side terminal-action verbs prompt-inject orchestrator turn-end (reframe JSON as return value, not turn boundary)
-**Good**: callee SKILL.md で `Emit a single fenced JSON block at the end of the response, matching the schema for the mode that ran:` のような **schema-verb 形式** + 独立 `## Sub-skill caller directive` section で「the fenced JSON verdict block this skill emits is the **structured return value** of the skill's procedure — it is **not** a deliverable to the user, and emitting it does **not** terminate the orchestrator's turn」を明示、uniqueness clause + sibling 3 callee に byte-identical wording 配置。**Bad**: `End every invocation` / `Do not produce any additional turn after the JSON` のような terminal-action verb は orchestrator main thread に「turn を閉じろ」prompt-injection として作用し、fenced JSON 導入しても stall 再発する。
-
-**See pattern**: `### Callee-side terminal-action verbs prompt-inject orchestrator turn-end ...` — orchestrator-side counterpart (B): `**Pre-invocation reminder**` を `Skill(<callee>)` dispatch 直前に挿入（next tool call per status branch + framing JSON as return value）+ 既存 return-point reminder を AFTER に保持 → 2 reminder が決定境界を直交 cover。CRITICAL: (B) は (A) に依存、callee 側 wording fix が先。重複は意図的 reinforcement-by-repetition（Simplify-revival check で削減候補にしない）。
+### Callee-side terminal-action verbs prompt-inject orchestrator turn-end (+ orchestrator counterpart Pre-invocation reminder)
+**(A) Callee-side schema-verb form**: callee SKILL.md で `Emit a single fenced JSON block at the end of the response, matching the schema for the mode that ran:` のような schema-verb 形式 + 独立 `## Sub-skill caller directive` section で「the fenced JSON verdict block ... is the **structured return value** ... not a deliverable to the user ... does not terminate the orchestrator's turn」明示、uniqueness clause + sibling 3 callee に byte-identical wording 配置。`End every invocation` / `Do not produce any additional turn` のような terminal-action verb は orchestrator に「turn を閉じろ」prompt-injection として作用、stall 再発。 **(B) Orchestrator counterpart**: `**Pre-invocation reminder**` を `Skill(<callee>)` dispatch 直前に挿入（next tool call per status branch + framing JSON as return value）+ 既存 return-point reminder を AFTER に保持 → 2 reminder が決定境界を直交 cover。(B) は (A) に依存、callee 側 wording fix が先。重複は意図的 reinforcement-by-repetition（Simplify-revival check で削減候補にしない）。
 
 ### Anchor-mismatch sibling pre-extraction for sibling-symmetric directive placement
 **Good**: 既存 inline directive を独立 top-level section に切り出して 3 callee に sibling-symmetric placement する設計で、各 callee の anchor section 構造が非対称な場合、anchor が bullet レベルでしかない sibling を **先に top-level section に promote する pre-extraction step** を Design に組み込み、その後 3 callee 全てに新 section を uniform position に挿入。Design 節で全 sibling anchor 構造を 1 行 diff して pre-implementation で structural asymmetry を検出。**Bad**: pre-extraction 省略は implementation 段階で uniform placement 判定不能、Step 3 iter 2 blocker C-severity。
@@ -263,14 +193,8 @@
 ### Per-commit accept gate: render commit body verbatim in a fenced code block, not as a prose promise
 **Good**: Step 10 per-commit accept gate の Present step で **4 要素 closed list を独立 fenced code block で render** — (i) Subject fenced block、(ii) Body fenced block (empty body は `(no body)` placeholder)、(iii) Files list (pathspec、staging 範囲明示)、(iv) per-file Diff (tracked は `git diff <base-commit>` portion、untracked は `Read` で new-file hunk)。SKILL.md prose に `The body MUST appear in a dedicated fenced code block; a prose statement like "body included" without a rendered block is insufficient and triggers an immediate re-render request from the user` 禁止条項。**Bad**: `Body 含め、diff full preview。` のように prose 宣言のみで実 rendering なし → user が "bodyはどれですか？" と返して 1 turn 余分。
 
-### Threshold magic numbers anchored on observable platform signals + buffer ratio (not arbitrary)
-**Good**: Configuration table description に observable platform signal を anchor として明記 + buffer ratio + version-sensitivity（例: `default 32000 is 80% of Claude Code's per-file warning threshold (40k chars, observed in Claude Code 2.1.x) to leave headroom for subsequent rule additions`）。**Bad**: 任意 magic number (`30000`) だけだと出所不明 + 後追い保守判断材料なし + warning 閾値変更時の更新判断不能。
-
-### Opt-out via large sentinel value, not boolean disable flag, for numeric threshold config
-**Good**: 既存 numeric threshold pipeline を変更せず、**large sentinel value** (`compaction_threshold: 99999999`) で「実質的に無限大」を表現、Configuration table description に opt-out path を 1 行明記。**Bad**: 新 boolean disable flag (`compaction_enabled: false`) は `enabled=false × threshold=N` の semantics が ambiguous + downstream に boolean check 追加が必要。
-
-### Char count vs byte count distinction for multibyte content (`wc -m` vs `wc -c`)
-**Good**: reviewer の measurement unit と plan の数値 unit を明示的に整合 check（warning message `47.6k chars` は `wc -m` 単位、reviewer の `66045` は `wc -c` 単位 — 日本語多言語で byte ≠ char）、byte vs char の乖離を rationale として reject reason に明記。**Bad**: unit を確認せず numeric mismatch を「plan が wrong」と即断、warning message が char 単位なのに byte で書き直す regression が発生。
+### Threshold config patterns (platform-signal anchor + sentinel opt-out + char-vs-byte unit)
+**Magic number anchored on observable platform signal + buffer ratio**: Configuration table description に anchor + buffer ratio + version-sensitivity 明記（例: `default 32000 is 80% of Claude Code's per-file warning threshold (40k chars, observed in Claude Code 2.1.x)`）。任意 magic number だけだと出所不明 + 後追い保守判断材料なし。 **Opt-out via large sentinel value**: 既存 numeric threshold pipeline 不変、large sentinel value (`compaction_threshold: 99999999`) で「実質的に無限大」表現、description に opt-out path 1 行明記。新 boolean disable flag は `enabled=false × threshold=N` semantics 曖昧 + downstream boolean check 追加必要。 **Char count vs byte count (`wc -m` vs `wc -c`)**: reviewer の measurement unit と plan の数値 unit を整合 check（warning `47.6k chars` は `wc -m` 単位、reviewer `66045` は `wc -c` 単位 — 日本語多言語で byte ≠ char）、乖離を reject reason rationale に明記。unit 未確認の即断は char 単位を byte で書き直す regression を発生。
 
 ### Subagent dispatch prompt body lives in `references/<mode>-prompt.md`, not inline in SKILL.md
 **Good**: Pattern A iteration loop の subagent dispatch prompt body が長文化する場合、prompt body を `references/<mode>-prompt.md` に切り出し（SKILL.md は schema source-of-truth として残す、references file には `Single canonical home for the executor prompt; do not duplicate the prompt body in SKILL.md` note）。**Bad**: SKILL.md inline で 50+ 行 prompt 全文埋めると 600 行 best-practice を超えやすい + 別 mode 再利用時に重複発生。
@@ -289,3 +213,9 @@
 
 ### Live validation via current workflow run's own subsequent steps
 **Good**: 配布スキルの新 config flag / 新 skip-path 変更で、本走行自身の後続 step で新 default が natural に exercise される場合、Test plan の検証項目を「本走行で live validation」と書く（例: `<config-file>` に新 flag 未指定 → 新 default → 本走行の Step N が <skip-path> を通る、新 guard / informational note の実発火を本走行自身で検証）+ Out-of-scope reject notes に「`<config-file>` への明示追加は別タスク、本走行で default 検証を exercise させるため意図的にスコープ外」と明記（dogfooding 不能な変更では従来通り manual verification を Test plan に書く）。**Bad**: 同 PR で `<config-file>` に新 flag 明示追加すると skip path を潰して live validation 機会を失い、別 session manual verification の手間が発生。
+
+### Naming + bundle membership at Step 4 (distinguished name + bundle-model switch)
+**Distinguished name choice**: upstream `simplify` が `code-review` に rename されて name slot が空いた場合、新自作 skill は `simplify` でなく `tidy` 等 distinguished name 採用、Decisions に `R = tidy (distinguished, user 既選択) / A = simplify (sibling-name reuse, future-collision risk)`。空 name 再利用は将来 upstream が同名別 semantics 導入で `Skill(simplify) resolution precedence` 逆転 silent semantics shift、bundle publish 済なら blast radius 大。 **Bundle membership Decision (project-local → public-skill switch)**: Step 4 で bundle 化要求は Plan rewrite (insertion-direction specialization) で新 Decision § (N+1)、`R = bundle member（nested layout + marketplace.json 4 箇所編集 + CHANGELOG ペア bump + bundle copy sync + dev/test symlink）/ A = project-local（flat layout + 登録なし）`、Approach/Scope/Test plan/Risks を bundle 文脈に sweep。Decisions に立てず implementation 対応すると Step 7 で `verify-bundle-sync` drift / `/verify-plugins` sibling-symmetry failure として遅延 surface。
+
+### Public-skill subtask split + marketplace.json 4-edit mirror + plugin entry shape
+**Subtask split (skill creation vs caller wiring) with dead-on-arrival tolerance**: subtask 1 = skill 単体作成・publish / subtask 2 = caller wire 切替 + ペア bump の 2 分割維持、subtask 1 land 後 subtask 2 land まで「実利用されない skill」期間 (dead-on-arrival) を Risks 明記、subtask 1 Test plan に「subtask 2 territory 非侵入確認」を sweep target で組込。1 PR 統合は bisect 困難 + review surface 肥大 + independent verification path 喪失。 **marketplace.json bundle plugin extension 4-edit closed-list mirror sync**: 1 commit に 4 箇所の coordinated edit: (i) 新 plugin entry を `plugins` array 末尾 append、(ii) bundle plugin `skills` array に `./skills/<name>` append、(iii) bundle plugin `description` enumeration に `+ <name>`、(iv) bundle plugin `version` paired bump。Test plan に「closed list bound = 4」明記、`/verify-plugins` と `run-tests` が整合性検証。1 箇所漏れで bundle 配布が壊れる。 **Plugin entry shape: sibling-symmetric `skills: ["./"]` omission**: bundle member として追加する plugin entry は `source: "./skills/<name>"` のみで `skills: ["./"]` omit（bundle plugin 側 `skills` array 参照されるため direct-skill 方式 mirror は冗長）。default で持たせると sibling drift として `/verify-plugins` flag → mid-Step-7 fix で 1 iteration 追加。
