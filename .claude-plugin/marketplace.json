@@ -127,10 +127,10 @@
     },
     {
       "name": "dev-workflow-bundle",
-      "description": "Development workflow bundle (includes peer + extract-rules + dev-workflow + rules-review)",
+      "description": "Development workflow bundle (includes peer + extract-rules + dev-workflow + rules-review + tidy)",
       "source": "./plugins/dev-workflow-bundle",
-      "skills": ["./skills/ask-peer", "./skills/dev-workflow", "./skills/extract-rules", "./skills/rules-review"],
-      "version": "1.39.2",
+      "skills": ["./skills/ask-peer", "./skills/dev-workflow", "./skills/extract-rules", "./skills/rules-review", "./skills/tidy"],
+      "version": "1.39.3",
       "author": {
         "name": "hiropon"
       },
@@ -151,6 +151,16 @@
       "description": "Check code changes for .claude/rules/ compliance using parallel sub-agent review",
       "source": "./skills/rules-review",
       "version": "1.1.4",
+      "author": {
+        "name": "hiropon"
+      },
+      "category": "workflow"
+    },
+    {
+      "name": "tidy",
+      "description": "Review changed code for reuse, quality, and efficiency, then apply cleanup edits. Replaces the cleanup behavior dropped from upstream simplify in claude-code v2.1.147.",
+      "source": "./skills/tidy",
+      "version": "1.0.0",
       "author": {
         "name": "hiropon"
       },

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-22
+
+### tidy v1.0.0 / dev-workflow-bundle v1.39.3
+
+- feat(tidy): introduce new bundle skill that replicates the cleanup-and-fix behavior dropped from upstream simplify in claude-code v2.1.147. Pattern A (Skill wrapper + Agent dispatch + main-thread Edit + iteration loop + fenced JSON return contract); siblings with `verify-diff` / `skill-review`. Scope expands beyond `skill-review`'s `skills/<name>/` filter to cover all changed files (tracked + untracked, with cross-ecosystem lockfile / build-artifact / binary exclusion). Step 6 of `dev-workflow` will be wired to `Skill(tidy)` in a follow-up subtask.
+
 ## 2026-05-21
 
 ### ask-peer v2.2.8 / dev-workflow-bundle v1.39.2
