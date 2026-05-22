@@ -10,20 +10,24 @@ The review walk runs in a fresh subagent per iteration (Pattern A — same shape
 
 ## Invocation contract
 
-The caller passes this field in natural language (the skill extracts it from the invocation text):
+The caller passes these fields in natural language (the skill extracts them from the invocation text):
 
+- `Base ref` *(optional, default `<working-tree-vs-HEAD>`)* — git ref to diff against. When omitted, the skill looks at the working tree's uncommitted + staged changes (the default scope for `dev-workflow` post-implementation review). When specified (e.g. `Base ref: main`), the skill switches to `git diff <Base ref>` semantics — useful for callers like `dev-workflow-triage` that want to review a stack of already-committed changes between a base branch and HEAD.
 - `Max iterations` *(optional, default `3`)* — upper bound on the refinement loop. Default `3` mirrors `verify-diff`'s default; prose-quality polish typically converges in 1–2 iterations.
 
-The caller must **not** stage changes while this skill is running. The skill reads the working tree; staged content would mix into the diff and corrupt the verdict.
+The caller must **not** stage changes while this skill is running. The skill reads the working tree; staged content would mix into the diff and corrupt the verdict. (The `Base ref` mode reads committed history vs the ref, so staging interference applies only to the default working-tree mode.)
 
 ## Process
 
 ### Step 1 — Detect changed skill files (main thread)
 
-1. Run `git diff --name-only` and `git diff --name-only --cached` to find uncommitted changes
-2. Filter to files matching `skills/*/SKILL.md`, `skills/*/README.md`, `skills/*/references/*`, `.claude/skills/*/SKILL.md`, `.claude/skills/*/references/*`
-3. Hold the filtered set in main-thread context as `changed_files` (the scope-check baseline for Step 3 (c)).
-4. If `changed_files` is empty, emit the verdict `{"status": "no-actionable-findings", "iterations_used": 0, "applied_edits_count": 0, "notes_remaining_count": 0, "reason": null}` per `§ Return contract` and stop. `iterations_used: 0` because the iteration loop never runs (mirrors `verify-diff`'s "Step 1 early returns count as 0" rule).
+1. Parse `Base ref` and `Max iterations` from the invocation text per `§ Invocation contract`.
+2. Compute the changed-file set based on `Base ref`:
+   - Default mode (no `Base ref` provided): run `git diff --name-only` and `git diff --name-only --cached` to find uncommitted + staged changes.
+   - Explicit mode (e.g. `Base ref: main`): run `git diff --name-only <Base ref>` — captures the cumulative diff from `<Base ref>` to HEAD (committed history, not working-tree).
+3. Filter to files matching `skills/*/SKILL.md`, `skills/*/README.md`, `skills/*/references/*`, `.claude/skills/*/SKILL.md`, `.claude/skills/*/references/*`.
+4. Hold the filtered set in main-thread context as `changed_files` (the scope-check baseline for Step 3 (c)).
+5. If `changed_files` is empty, emit the verdict `{"status": "no-actionable-findings", "iterations_used": 0, "applied_edits_count": 0, "notes_remaining_count": 0, "reason": null}` per `§ Return contract` and stop. `iterations_used: 0` because the iteration loop never runs (mirrors `verify-diff`'s "Step 1 early returns count as 0" rule).
 
 ### Step 2 — Gather review inputs (main thread)
 
@@ -31,7 +35,7 @@ For each changed skill, in the main thread:
 
 1. `Read` the full `SKILL.md` and any changed `references/` or `README.md` files. Hold the contents in main-thread context as the iter-1 snapshot.
 2. `Read` `references/best-practices.md`.
-3. Pre-capture each changed file's `git diff`. For staged-only changes, use `git diff --cached -- <file>`; for working-tree-only changes, use `git diff -- <file>`; if both have content (mixed staged + unstaged edits), concatenate them — staged section first — into one unified diff payload.
+3. Pre-capture each changed file's `git diff`. In default mode (no `Base ref`): for staged-only changes use `git diff --cached -- <file>`, for working-tree-only changes use `git diff -- <file>`, for mixed staged + unstaged edits concatenate them (staged section first) into one unified diff payload. In explicit `Base ref` mode: use `git diff <Base ref> -- <file>` (committed history vs the ref).
 
 ### Step 3 — Iteration loop (i = 1 .. Max iterations)
 

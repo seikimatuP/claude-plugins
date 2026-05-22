@@ -1,6 +1,6 @@
 ---
 name: triage-review
-description: Daily review of the latest origin triage-* branch. Operator-prepared invariant — the operator fetches origin and switches the local repository to the triage branch before invocation. The skill verifies that the current branch matches `triage-*`, then dispatches `Skill(prompt-tuning)` per prompt-eligible changed file, `Skill(skill-review)` with a minimal natural-language main..HEAD review instruction, and `Skill(publicity-review)` with `Base ref: main` in sequence, finally emits a summary. Project-local routine — not for marketplace distribution.
+description: Daily review of the latest origin triage-* branch. Operator-prepared invariant — the operator fetches origin and switches the local repository to the triage branch before invocation. The skill verifies that the current branch matches `triage-*`, then dispatches `Skill(prompt-tuning)` per prompt-eligible changed file, `Skill(skill-review)` with `Base ref: main`, and `Skill(publicity-review)` with `Base ref: main` in sequence, finally emits a summary. Project-local routine — not for marketplace distribution.
 allowed-tools: TodoWrite, Skill(prompt-tuning), Skill(skill-review), Skill(publicity-review), Bash(git rev-parse *), Bash(git symbolic-ref *), Bash(git status --porcelain*), Bash(git diff *)
 ---
 
@@ -109,13 +109,13 @@ Record the per-file classification in a result list. `unparsed` and `error` are 
 
 (a) **Pre-invocation reminder**: the next tool call is `Skill(skill-review)` dispatch. Its return is a fenced JSON verdict — parse it as a return value, branch on the `status` enum, and issue the next tool call (§ Step 5 dispatch). Do not insert prose between the verdict and the next action. See `§ No-Stall Principle`.
 
-(b) Invoke `Skill(skill-review)` with the **minimal natural-language form** below (verbatim — longer or more explicit forms cause the callee to follow procedural code literally and early-return on empty `git diff`):
+(b) Invoke `Skill(skill-review)` with the short form below. `skill-review` accepts the `Base ref` field in its own `## Invocation contract` (same pattern as `publicity-review`), so this form is contract-sanctioned. `Max iterations` is left at its default of `3`:
 
 ```
-mainからHEADの差分をレビューして
+Base ref: main
 ```
 
-Do **not** append: triage branch name, the `changed_files` list, an explicit `git diff main HEAD` reference, base-override hints, or any other expansion. The single short sentence is the entire invocation argument.
+Do **not** append: triage branch name, the `changed_files` list, an explicit `git diff main HEAD` reference, or any other expansion. The single contract-field line is the entire invocation argument.
 
 (c) **Parse the verdict** with the first-match-wins evaluate-in-order discipline from `.claude/skills/verify-diff/SKILL.md` § (b) Parse & apply, restricted to single-pass dispatch (Converged / Divergence cases are N/A here):
 
@@ -123,7 +123,7 @@ Do **not** append: triage branch name, the `changed_files` list, an explicit `gi
 2. Schema violation → record `skill_review_result = {status: "error", reason: "verdict schema violation", framing_status: "ok"}`, proceed
 3. Otherwise — extract `status`, `iterations_used`, `applied_edits_count`, `notes_remaining_count`, `reason` from the JSON
 
-(d) **Runtime framing-failed detection**: after parsing a successful verdict, check `iterations_used == 0 && status == "no-actionable-findings"`. When this signature appears **and** `changed_files` is non-empty (main..HEAD has changes), it is the signature of `skill-review` Step 1 early-returning on empty `git diff` — the natural-language framing did not redirect the procedural code. Record `framing_status = "framing-failed (suspected — iter=0 on non-empty main..HEAD)"` and surface as a warning in Step 6 form 3. Otherwise `framing_status = "ok"`.
+(d) **Runtime framing-failed detection** (legacy guard): after parsing a successful verdict, check `iterations_used == 0 && status == "no-actionable-findings"`. When this signature appears **and** `changed_files` is non-empty (main..HEAD has changes), it indicates `skill-review` Step 1 early-returned despite the `Base ref: main` invocation — most likely a `skill-review` contract-parsing regression. Record `framing_status = "framing-failed (suspected — iter=0 on non-empty main..HEAD)"` and surface as a warning in Step 6 form 3. Otherwise `framing_status = "ok"`. With the contract-field invocation form in (b), this guard should rarely fire — its presence is preserved as a downstream-regression detector.
 
 (e) **Return-point no-stall reminder**: after recording the verdict, immediately issue `Skill(publicity-review)` dispatch (§ Step 5). Do not emit an interstitial summary. See `§ No-Stall Principle`.
 

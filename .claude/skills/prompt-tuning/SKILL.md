@@ -37,6 +37,7 @@ When not to use:
    - **Evaluation scenarios**, 2 to 3 kinds. **Composition is hard**: always include at least 1 median (realistic typical use of the target prompt) AND at least 1 edge (atypical / failure-prone case — environment constraint, malformed input, ambiguous request, partial workflow, etc.). **Count is soft**: prefer 3, accept 2 when **executor token cost** is tight (dispatch budget — the main bound; one subagent run ≈ tens of thousands of tokens); never fewer than 2 (one scenario overfits). Note: in non-empirical modes such as baseline-only previews and `## Environment constraints` Alt 3 / structural review where no dispatch occurs, executor cost is zero — count can stay at 3 (or rise if the operator wants broader coverage), bounded only by the operator's own design time. Realistic tasks that assume actual situations where the target prompt would apply.
    - **Designed vs executed scenarios**: the count above fixes the *designed* set at baseline and is reused across iters (trend comparisons need a stable design set). The *executed* set per iter defaults to the whole designed set (dispatch all in parallel per step 2). Under resource bounds, executed may shrink to a strict subset — but the median scenario must execute every iter, and iters with `|executed| < |designed|` are **partial iters**: results inform fixes but do not count toward consecutive-clear judgment in `## Iteration stopping criteria`.
    - **Requirements checklist** (for computing accuracy). For each scenario, enumerate 3 to 7 items the deliverable must satisfy. Accuracy % = items satisfied / total items. Fix this in advance (do not move it afterward).
+   - **Mechanism vs outcome — checklist items judge the deliverable, not the runtime**: each item, especially `[critical]` items, must describe a property of the **deliverable** (output quality, coverage of required viewpoints, expected format, scope adherence) — not the **runtime mechanism** the executor uses to produce it (e.g. "spawned a subagent via the `Agent` tool", "called a specific helper skill", "issued exactly N tool calls"). Mechanism-focused `[critical]` items conflate "the target prompt is well-designed" with "the executor's environment can run the prompt's preferred path", so an executor that produces the right deliverable via an environment-forced fallback (recursive `Agent` blocked, a tool absent, etc.) gets scored × on the target's quality. Phrase checks in terms of what the user would see in the deliverable; if a mechanism check is genuinely load-bearing for the target, put it in a non-`[critical]` item so it surfaces without dominating the success / failure judgment.
    - **Target-size scaling** (relaxation of the floors above for tiny targets): the "≥2 scenarios" and "≥3 items per checklist" floors are calibrated for skill-sized targets (~100+ lines, multiple distinct usage paths). For micro-targets they force contrived over-decomposition. Apply this scaling rule when **both** sub-conditions hold:
      - target body ≤ ~50 lines (excluding frontmatter), AND
      - target has ≤ ~3 distinct usage paths / branches (e.g., a 3-command CLI wrapper, a short CLAUDE.md fragment).
@@ -255,56 +256,64 @@ Cost: variant exploration doubles dispatch count per iteration. Use when plateau
 
 ## Presentation format
 
-**Render rule for plan-only / baseline-only previews**: when an iteration block accompanies a baseline-only deliverable (no execution this round — e.g. the operator intentionally stops at Step 1 baseline preparation to stage scenarios across runs, or wants to publish the iter-1 plan for review before paying dispatch cost), keep the execution-results table present but mark every cell as `(pending — not dispatched)`. Do not silently omit the table. The Structured reflection / Discretionary fill-ins / Ledger updates / Next fix proposal sections are still populated normally, but their **content origin is redirected** for this render: `Structured reflection` sources from iter-0 static findings and baseline-design observations (rather than executor self-reports, which do not exist yet); `Discretionary fill-ins` sources from baseline-design choices (scenario count, edge flavor, draft-prompt selection, etc.); `Ledger updates` is typically empty (no empirical findings to enter; the ledger is empirical-only). When dispatch finally happens in a later iter, these sections revert to their canonical content origins. This mode is distinct from Structural review mode (see Environment constraints): there, dispatch is *impossible*; here, dispatch is *deferred by choice*.
+**出力言語**: ユーザーへの提示は日本語で行う。ただし以下のトークン / キーは triage-review 等の caller がパース時に検出するため verbatim で残す:
 
-**Per-cell sentinel for partial-iter rows**: when a dispatch was attempted this iter but did not produce metrics for some scenarios (e.g., one scenario timed out, was excluded for resource bounds per Workflow Step 1's `|executed| < |designed|`, or returned without a parseable `<usage>` block), use `—` (em-dash) in the affected cells. This is distinct from the iter-wide `(pending — not dispatched)` form above: `—` is per-cell within an otherwise-dispatched iter. Rows that contain `—` in `steps` or `duration` are **excluded** from the `Step count variation ±10%` / `Duration variation ±15%` calculations in `## Iteration stopping criteria` (per-row exclusion; the iter still counts toward consecutive-clear judgment as long as the median scenario row has measured values). Do not substitute `0`, `N/A`, blank, or invent estimates — only `—` is parseable as "intentionally unmeasured for this cell".
+- `Convergence check`、`Iteration N` / `iter-N`、`Max iterations`
+- `iter-0: PASS` / `iter-0: PASS-with-note` / `iter-0: BLOCK-consistency`
+- `Issue` / `Cause` / `General Fix Rule`（subagent invocation contract のキー）
+- `[critical]` 等のタグ、設定値（`tool_uses` / `duration_ms` 等）、ファイルパス、識別子
 
-Record and present to the user with the following form at each iteration:
+**ベースライン / プレビューのみのレンダリング規律**: イテレーションブロックがベースライン提示のみ（今ラウンドで実行なし — 例: 想定状況の準備を複数走行に分けて行うため Step 1 で意図的に止める、または dispatch コストを払う前に iter-1 のプランをレビューに出したい）の場合、実行結果テーブルは保持するがすべてのセルを `(pending — not dispatched)` でマークする。テーブルを暗黙に省略しない。「構造化された反省 / 裁量補完 / 台帳の更新 / 次回の修正案」の各節は通常通り埋めるが、**内容の出所が読み替えられる**: 「構造化された反省」は iter-0 の静的検出 + ベースライン設計の所見から（executor のセルフレポートはまだ存在しない）、「裁量補完」はベースライン設計時の選択（想定状況の数、エッジの種類、下書きプロンプトの選定など）から、「台帳の更新」は通常空（記録すべき empirical な所見がない — 台帳は empirical 専用）。後の iter で dispatch が走ったら、これらの節は本来の出所に戻る。これは「Structural review モード」（`## Environment constraints` 参照）とは別: 後者は dispatch が **不可能**、こちらは dispatch を **意図的に後回し** にしているケース。
+
+**部分イテレーション行のセル単位センチネル**: 今 iter で dispatch を試みたが一部の想定状況の指標が取れなかった場合（例: 1 想定状況がタイムアウト、Workflow Step 1 の `|executed| < |designed|` ルールでリソース上の理由から除外、または `<usage>` ブロックがパースできない応答）、該当セルに `—`（em-dash）を入れる。これは iter 全体の `(pending — not dispatched)` 形式とは区別される: `—` は dispatch 済み iter 内のセル単位扱い。`手順数` または `所要時間` の列に `—` を含む行は、`## Iteration stopping criteria` の「手順数の変動 ±10%」「所要時間の変動 ±15%」の計算から **除外** される（行単位の除外。中央値の想定状況の行に実測値が残っていれば iter は連続クリア判定に算入される）。`0` / `N/A` / 空白 / 推測値で代用しないこと — `—` のみが「このセルは意図的に未計測」とパース可能。
+
+各イテレーションで、ユーザーには以下の形式で記録・提示する:
 
 ```
 ## Iteration N
 
-### Changes (diff from previous)
-- <one-line fix content>
-- Pattern applied: <pattern name from ledger, or "(new)">
+### 変更内容（前回比）
+- <1 行の修正内容>
+- 適用パターン: <ledger 内のパターン名、または「（新規）」>
 
-### Execution results (per scenario)
-| Scenario | Success/Failure | Accuracy | steps | duration | retries | Weak phase |
+### 実行結果（想定状況ごと）
+| 想定状況 | 成否 | 達成率 | 手順数 | 所要時間 | やり直し | 弱い段階 |
 |---|---|---|---|---|---|---|
 | A | ○ | 90% | 4 | 20s | 0 | — |
-| B | × | 60% | 9 | 41s | 2 | Execution |
+| B | × | 60% | 9 | 41s | 2 | 実行 |
 
-### Structured reflection (newly surfaced this time)
-- <Scenario B>: [critical] item N is × — <one-line reason for drop>
-  - Issue: <what observably happened>
-  - Cause: <why, at the instruction level>
-  - General Fix Rule: <class-level abstraction>
-- <Scenario A>: (nothing new)
+### 構造化された反省（今回新たに surface したもの）
+- <想定状況 B>: [critical] 項目 N が × — <1 行で達成できなかった理由>
+  - Issue: <観測された事実>
+  - Cause: <指示側の原因>
+  - General Fix Rule: <同種ミスを防ぐ汎用ルール>
+- <想定状況 A>: （新規なし）
 
-### Discretionary fill-ins (newly surfaced this time)
-- <Scenario B>: <fill-in content>
+### 裁量補完（今回新たに surface したもの）
+- <想定状況 B>: <補完内容>
 
-### Ledger updates
-- Added: <pattern name> (from Scenario B)
-- Re-seen: <pattern name> (originally iter K) — existing fix did not prevent recurrence because <reason>
+### 失敗パターン台帳の更新
+- 追加: <パターン名>（想定状況 B から）
+- 再観測: <パターン名>（初観測 iter K）— 既存の修正で再発を防げなかった理由: <理由>
 
-### Next fix proposal
-- <one-line minimum fix>
+### 次回の修正案
+- <1 行の最小修正>
 
 (Convergence check: X consecutive clears / Y rounds remaining to stop condition)
 ```
 
-**Skipped-iteration form** (when the *entire* iter is skipped per `## Environment constraints`, not the per-cell case covered by `Per-cell sentinel for partial-iter rows` above): emit the `## Iteration N` heading, fill every metric cell with `—`, write the iter 0 verdict above the table (or `not-run` when iter 0 itself was skipped) — this **replaces, not supplements**, any earlier iter-0 emission required by `Workflow` Step 0; emit the verdict line in exactly one location for a skipped iter, immediately above the table — insert `> **Iter skipped** — see the skip return contract at the end of the response for `alternative_taken` and `reason`.` as a blockquote between the iter-0 verdict line and the table (this disambiguates the all-`—` table from a partial-iter case where every per-cell sentinel happens to be `—`), and append the fenced skip return contract from `## Environment constraints` as the **final element** of the response. Skipped iters do not count toward consecutive-clear judgment in `## Iteration stopping criteria`.
+**Skipped-iteration form**（iter 全体が `## Environment constraints` に従ってスキップされたケース。上で説明したセル単位のケースとは別）: `## Iteration N` の見出しを出し、すべての指標セルを `—` で埋め、iter 0 の判定をテーブル直上に書く（iter 0 自体がスキップなら `not-run`）。この判定行は `Workflow` Step 0 で要求される iter-0 出力を **置き換える**（追加でなく置換）。1 か所のみに判定を出す。さらに、iter-0 判定行とテーブルの間に `> **Iter skipped** — see the skip return contract at the end of the response for `alternative_taken` and `reason`.` をブロック引用で挿入する（これによって、すべてのセルがたまたま `—` の部分 iter ケースと区別できる）。応答の **最後の要素** として、`## Environment constraints` の fenced な skip return contract を付ける。スキップ iter は `## Iteration stopping criteria` の連続クリア判定に算入されない。
 
-**Other sections under Skipped-iteration form** (disposition of each presentation-format section listed in the template above):
-- `Changes (diff from previous)`: keep — record "(no diff applied; iter skipped)" plus the `Pattern applied` line if a known pattern from the ledger motivated the iter's existence; otherwise `Pattern applied: (n/a — skipped)`.
-- `Execution results (per scenario)`: keep the table, every metric cell `—` per the rendering rule above.
-- `Structured reflection (newly surfaced this time)`: keep — if Alt 3 (Structural review) is the alternative taken, source from the static review's unclear-points about the prompt-tuning skill itself (per `## Environment constraints` § Domain discipline); if Alt 1 / Alt 2 with no static review, this section is empty (`(no reflection — iter skipped without static review)`).
-- `Discretionary fill-ins (newly surfaced this time)`: same origin rule as Structured reflection — only present when static review supplied them; otherwise omit the section header.
-- `Ledger updates`: always empty (`(no updates — ledger is empirical-only per § Failure pattern ledger)`).
-- `Next fix proposal`: present **only** when a static review (Alt 3) produced a targeted improvement candidate for the prompt-tuning skill itself or for the target prompt; otherwise omit. Skipped-iteration form is not a vehicle for fixes derived from non-empirical introspection of the canonical methodology; do not fabricate proposals just to fill the slot.
-- **Pre-skip baseline-prep artifacts** (designed scenarios + their requirements checklists from Workflow Step 1, produced *before* the skip decision fires): these are not lost on skip. Default disposition — render them inline under a sub-heading `### Designed scenarios (carried over to next iter)` immediately before the Execution results table, so the operator can audit the design without scrolling into the JSON contract. Under Alt 3, the scenarios may *also* be referenced from the `Deliverable` (when the static review of the target leans on scenario framing) — that is duplication of reference, not duplication of content; the canonical render stays in the `Designed scenarios` block. Under Alt 1 / Alt 2 with no static review, still emit the block (it documents what would have run had dispatch been available). **Degenerate case — baseline-prep did not run** (Step 0 scope filter / Pre-flight callability check resolved to skip before `Workflow` Step 1 entered, so `designed_scenarios_count = 0`): keep the `### Designed scenarios (carried over to next iter)` sub-heading and replace its contents with a one-line note `(none — baseline-prep did not run; skip decision fired before Step 1)`. Do **not** omit the heading silently — preserving it documents that the absence is intentional, not a render bug.
-- Convergence-check trailer line: emit `(Convergence check: <X> consecutive clears / iter skipped, does not advance)` so the convergence ledger stays auditable.
+**スキップ iter 形式での他セクションの扱い**（上のテンプレートに出てくる各セクションの扱い）:
+
+- `変更内容（前回比）`: 残す — `(差分適用なし; iter skipped)` と書き、`適用パターン` 行は ledger 由来の既知パターンがあればその名前、なければ `適用パターン: (該当なし — skipped)`
+- `実行結果（想定状況ごと）`: テーブルは残す。すべての指標セルが `—`（上のレンダリング規律どおり）
+- `構造化された反省（今回新たに surface したもの）`: 残す — Alt 3（Structural review）が選択されていれば、その静的レビューが `prompt-tuning` スキル自体に対して挙げた分かりにくい点から記載（`## Environment constraints` の Domain discipline 参照）。Alt 1 / Alt 2 で静的レビューがなかった場合は空（`(反省なし — 静的レビューなしで iter skipped)`）
+- `裁量補完（今回新たに surface したもの）`: 構造化された反省と同じ出所ルール — 静的レビューが供給した場合のみ載せる。それ以外はセクション見出しごと省略
+- `失敗パターン台帳の更新`: 常に空（`(更新なし — 台帳は empirical 専用、§ Failure pattern ledger 参照)`）
+- `次回の修正案`: 静的レビュー（Alt 3）が `prompt-tuning` スキル自体または対象プロンプトに対して具体的な改善候補を出した場合 **のみ** 載せる。それ以外は省略。スキップ iter 形式は、empirical 評価でない内省から得た修正案を入れる場所ではない。空欄を埋めるための捏造はしない
+- **スキップ前のベースライン準備の成果物**（想定状況の設計 + 各々の評価項目チェックリスト。Workflow Step 1 でスキップ判断より前に作られたもの）: スキップ時に失われない。標準の扱い — 実行結果テーブルの直前に、サブ見出し `### 設計済み想定状況（次イテレーションに繰越）` の下にインラインで出す。これによって、設計内容を JSON contract までスクロールせずに確認できる。Alt 3 では、想定状況が `Deliverable` からも参照される場合がある（対象の静的レビューが想定状況の枠組みを使う時）— これは参照の重複であって内容の重複ではない。標準のレンダリングは `設計済み想定状況` ブロックに残す。Alt 1 / Alt 2 で静的レビューなしの場合でもこのブロックは出す（dispatch が可能だったら何が走っていたかを記録するため）。**退化ケース — ベースライン準備が走らなかった**（Step 0 のスコープフィルタ / Pre-flight callability check が Workflow Step 1 に入る前にスキップを決定し、`designed_scenarios_count = 0` となった場合）: `### 設計済み想定状況（次イテレーションに繰越）` の見出しを残し、中身を `(なし — ベースライン準備未実行; Step 1 前にスキップ判断が確定)` の 1 行で置き換える。見出しを暗黙に省略しないこと — 不在が意図的（描画バグでない）と記録するため
+- 末尾の収束チェック行: `(Convergence check: <X> consecutive clears / iter skipped, does not advance)` を出す。これで連続クリア台帳の追跡可能性が保たれる
 
 ## Red flags (beware of rationalization)
 
@@ -325,6 +334,7 @@ Record and present to the user with the following form at each iteration:
 - **Only looking at metrics**: chasing only time reduction strips important explanations and makes it fragile
 - **Too many changes per iteration**: you can no longer trace "which fix back then worked". One theme per iteration (2-3 related micro-fixes can be bundled — see Workflow's "Apply the diff" step and the Red flags table)
 - **Tuning scenarios to match the fix**: making the scenario side easier just to make unclear points look eliminated → putting the cart before the horse
+- **Mechanism-focused `[critical]` items**: putting a runtime-mechanism check (e.g., "the executor spawned a subagent via `Agent`") into `[critical]` instead of an outcome property of the deliverable. An executor that produces the right deliverable via an environment-forced fallback gets scored × on the target prompt's quality. See Workflow Step 1's "Mechanism vs outcome — checklist items judge the deliverable, not the runtime" bullet.
 
 ## Related (external, optional)
 
