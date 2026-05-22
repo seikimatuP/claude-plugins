@@ -14,5 +14,5 @@ hooks:
     - "Skill(work-complete)"
 self_retrospective:
   feedback: "SonicGarden/dev-workflow-issues"
-compact_rules: true
+compact_rules: false
 ---
