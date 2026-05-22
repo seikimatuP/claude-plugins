@@ -6,19 +6,19 @@ Each item is **judgment-style**, not a regex — describe the cleanup opportunit
 
 ## Items
 
-1. **Redundancy / duplication** — same logic appearing at 2+ sites within the diff (extract or inline); the same data structure declared in multiple places (consolidate). Source: `dev-workflow` Step 8 (c) Simplicity & maintainability — `duplication`.
+1. **Redundancy / duplication** — same logic appearing at 2+ sites within the diff (extract or inline); the same data structure declared in multiple places (consolidate).
 
-2. **Dead code** — unused imports, unused variables / parameters, unreachable branches, code that the user explicitly removed earlier in the session and a later edit re-introduced. Source: `dev-workflow` Step 5 — `content the user explicitly removed earlier in this session ... must not reappear`; Step 8 (c) — `unnecessary complexity`.
+2. **Dead code** — unused imports, unused variables / parameters, unreachable branches, code that the user explicitly removed earlier in the session and a later edit re-introduced (deletion is authoritative, not a gap to fill).
 
-3. **Over-abstraction / premature generalization** — a helper called from exactly one site, a class with exactly one instantiation, a parameter that always receives the same value. Source: `dev-workflow` Step 8 (c) — `unclear abstractions`.
+3. **Over-abstraction / premature generalization** — a helper called from exactly one site, a class with exactly one instantiation, a parameter that always receives the same value.
 
-4. **Defensive guards on already-safe paths** — null checks where the call site guarantees non-null, redundant guard layers where an upstream guard already handles the case (double-coverage). Source: `dev-workflow` Step 8 (c) — `defensive hardening of already-safe paths` / `double-coverage`.
+4. **Defensive guards on already-safe paths** — null checks where the call site guarantees non-null, redundant guard layers where an upstream guard already handles the case (double-coverage).
 
-5. **Speculative features** — functionality beyond the stated requirement; features added "for future use" without an explicit trigger (user requirement, known bug, documented rule). Source: `dev-workflow` Step 8 (c) — `speculative features without explicit trigger`.
+5. **Speculative features** — functionality beyond the stated requirement; features added "for future use" without an explicit trigger (user requirement, known bug, documented rule).
 
-6. **Comment narration / preamble** — line-by-line paraphrase of code, restating surrounding context, comments that explain *what* the code does instead of non-obvious *why*. Source: `dev-workflow` Step 8 (b) — `narration ... and preamble ... as delete-candidates`.
+6. **Comment narration / preamble** — line-by-line paraphrase of code, restating surrounding context, comments that explain *what* the code does instead of non-obvious *why*.
 
-7. **Redundant prose in docs / SKILL.md** — re-statement of what well-named identifiers already convey, repeated rationale that adds no new constraint, paragraphs that paraphrase an adjacent paragraph. Source: `dev-workflow` Step 8 (c) — Simplify-revival check.
+7. **Redundant prose in docs / SKILL.md** — re-statement of what well-named identifiers already convey, repeated rationale that adds no new constraint, paragraphs that paraphrase an adjacent paragraph.
 
 8. **Naming consistency drift (within-diff scope)** — a rename that did not propagate to all call sites within the same change; a function whose name no longer matches its current behavior after the change. Out of scope: pre-existing name mismatches the diff does not touch.
 
