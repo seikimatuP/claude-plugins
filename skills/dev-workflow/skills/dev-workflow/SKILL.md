@@ -283,7 +283,18 @@ Mark `Step 3: Plan Review` as `completed`.
    f. **Call `ExitPlanMode` in the same turn, immediately after the guidance line.** `ExitPlanMode` triggers the approval modal — if it is not called, the user sees the plan text but has no way to approve. Delaying `ExitPlanMode` to a subsequent turn is the primary cause of Step 4 appearing stalled.
 
    Section headings (`Overview` / `Decisions` / `Design` / `Test plan` / `Risks` / `Unknowns`) and the Step 4 guidance line stay English.
-3. Collaborate with the user to refine the plan as needed (normal Plan Mode interaction). If the user requests material changes to scope or approach, add a new review iteration item (e.g. Step 3-(N+1)) and return to Step 3 to process it before re-presenting. After the user accepts, begin implementation.
+3. Collaborate with the user to refine the plan as needed (normal Plan Mode interaction). Categorize each user response into one of the four buckets below via semantic judgment (per § No-Stall Principle's "do not rely on exact-phrase matching" rule — example phrasings are illustrative, not literal discriminators):
+
+   - **accept**: explicit affirmative — "OK" / "approve" / "looks good" / "進めて" / any semantic equivalent. Begin implementation.
+   - **swap-decisions** (Decisions Recommendation/Alternative swap on one or more specific items — "Decision 1 を Alternative に", "swap the recommendation on the language flag", "use the alternative for Decision N", "Decision N と M は Alternative で残りはそのまま"): re-render the plan with the specified Recommendation / Alternative pairs swapped on the named Decisions items, leave other items unchanged, run the read-back sub-step below, then re-present the plan (re-enter the gate). When the user names multiple Decisions in one message, list every affected item on the read-back line so partial-coverage misses cannot slip through.
+   - **rewrite-approach** (Approach / Design / Scope-level material change — "switch from independent skill to extending sibling mode", "split this into two subtasks", "scope down to only the canonical site", or any change that does not fit a clean Decisions swap): add a new review iteration item (Step 3-(N+1)), run the read-back sub-step below, return to Step 3 to re-review the modified plan, then re-enter Step 4 from sub-step 1 (so sub-step 1's TodoWrite completion check on the new Step 3-(N+1) item and sub-step 1.5's prose-language re-entry-coverage audit both run before re-presenting at sub-step 2).
+   - **withdraw**: explicit halt — "stop" / "cancel" / "abort" / "やめる" / "取り下げ". Exit the workflow with no further steps; do not proceed to implementation.
+
+   **Read-back sub-step (mandatory before applying any `swap-decisions` / `rewrite-approach` interpretation)**: emit a one-line summary of the interpreted change in the resolved `language` (e.g. `Decision 1 を Alternative に切り替え、Decisions 2 と 3 は Recommendation のまま保持します — このまま反映してよろしいですか？`) and wait for the user to confirm before re-rendering. The read-back is the gate-of-origin's own resolution branch; do not nest a separate ExitPlanMode call inside it. If the user's confirmation response itself reads as another `swap-decisions` / `rewrite-approach` / `withdraw` instruction, treat the read-back as un-confirmed and re-classify under the four buckets above. The read-back catches multi-Decisions instructions with partial coverage and Approach-level instructions that masquerade as Decisions swaps — both are common failure modes that silently lose user-specified scope when interpreted without read-back.
+
+   **NOT approval** (interrogative or non-committal — "look good?" / "どう？" / "これでいい？"): treat as `swap-decisions` clarifier — ask the user to confirm whether they intended an affirmative or to surface a change request, then re-classify the response under the four buckets above. Do not silently advance.
+
+   After the user accepts (`accept` bucket), begin implementation.
 
 ### Step 5: Implement
 
