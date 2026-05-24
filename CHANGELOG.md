@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-05-24
+
+### extract-rules v1.17.0 / dev-workflow-bundle v1.43.0
+
+- feat(extract-rules): extend `--compact` mode with consolidation detection — the dispatched subagent now additionally identifies clusters of ≥`min_cluster_size` related bullets (default 3) per the new consolidation heuristics in `references/compaction-mode.md` § Consolidation heuristics, and emits cluster proposals (`cluster_bullets` + `merged_principle` + `replacements` with `delete` / `cross_ref` strategy) in the new `consolidation_proposals[]` field of each per-file record. Detection-only — proposals are not auto-applied (sibling to existing `structural_notes` as caller-judgment output). Top-level `status: "compacted"` mapping extended to a 3-way OR (`applied_edits_count > 0` OR non-empty `consolidation_proposals[]` OR non-empty `structural_notes[]`) — the `structural_notes` arm incidentally fixes a latent bug where `structural_notes`-only files previously fell into `no-actionable` and were silently dropped by callers branching on `compacted`. Explicit-paths mode now runs through per-file dispatch for under-threshold paths as well (the `skipped-below-threshold` enum value's semantic widens from "CP2 skipped entirely" to "compaction skipped because already below threshold, but CP2 still ran for the consolidation pass"); discovery mode threshold filter is unchanged — to scan small files for clusters, pass them explicitly via `--compact <path>`. New `min_cluster_size` configuration (default 3, set to a very large value such as `99999999` to disable consolidation while keeping compaction — matches the `compaction_threshold` opt-out sentinel convention). Caller wiring for `consolidation_proposals` user-gate display (`dev-workflow` Step 11 sub-step 3 gate expansion) is intentionally deferred to a follow-up subtask; existing callers see `consolidation_proposals` as an additive optional field they may safely ignore. Top-level `reason` token `"no files exceed threshold"` is renamed to `"no targets resolved"` to reflect the broadened Step CP1 step 4 semantics (an empty target set now also covers the "no explicit paths passed" case, not just the discovery-no-hits case).
+
 ## 2026-05-23
 
 ### extract-rules v1.16.0 / dev-workflow-bundle v1.42.0

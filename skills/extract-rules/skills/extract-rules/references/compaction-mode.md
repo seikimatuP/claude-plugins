@@ -1,13 +1,15 @@
 # Compaction Mode — Subagent Instructions
 
-These instructions are dispatched to the subagent spawned in SKILL.md Step CP2 (a). The subagent reads one target rules file and returns a fenced JSON verdict containing `mechanical_edits` (safe to apply via `Edit`) and `structural_notes` (caller-judgment notes that are surfaced to the user, not applied automatically).
+These instructions are dispatched to the subagent spawned in SKILL.md Step CP2 (a). The subagent reads one target rules file and returns a fenced JSON verdict containing three output arrays: `mechanical_edits` (safe to apply via `Edit`), `structural_notes` (caller-judgment notes surfaced to the user, not applied automatically), and `consolidation_proposals` (cluster-merge proposals, also caller-judgment / not applied).
 
 ## Contract
 
-- **Input**: one target file (path + full current content), the four compaction heuristics, the `target_chars` threshold, the current iter number, and the response-format schema. All inputs are passed via `--- LABEL ---` fence sections in the dispatch prompt
+- **Input**: one target file (path + full current content), the four compaction heuristics, the four consolidation heuristics, the `target_chars` threshold, the `min_cluster_size` integer, the current iter number, and the response-format schema. All inputs are passed via `--- LABEL ---` fence sections in the dispatch prompt
 - **Output**: a single fenced JSON block matching the per-iter schema (see § Per-iter response schema below). No prose narrative around the JSON
 - **Apply phase**: the main thread (Skill wrapper) applies `mechanical_edits` via `Edit`. The subagent does **not** call `Edit` directly — this preserves the bias-free executor property (the analysis subagent is fresh per dispatch, while the apply phase stays in the main thread's working-tree context)
 - **`structural_notes` disposition**: the main thread surfaces these as user-facing notes (e.g. `dev-workflow` Step 11 user-gate). They are never auto-applied. Reserve `structural_notes` for proposals that cannot be safely expressed as mechanical edits
+- **`consolidation_proposals` disposition**: the main thread surfaces these as user-facing cluster-merge proposals — sibling to `structural_notes` but with richer per-cluster shape (bullet line ranges + merged-principle text + replacement strategies). They are detection-only and never auto-applied; the caller (e.g. `dev-workflow` user-gate, future wire) decides whether to merge any cluster
+- **Two heuristic sets, distinct output arrays**: the subagent runs both heuristic sets in a single dispatch and routes output to distinct arrays. (a) Compaction heuristics (the original four) emit into `mechanical_edits` (auto-applied) and `structural_notes` (caller-judgment). (b) Consolidation heuristics (the four added in § Consolidation heuristics below, gated by `min_cluster_size`) emit into `consolidation_proposals` only — never into `mechanical_edits`. The arrays do not share entries: a single observation classifies into exactly one array. `structural_notes` and `consolidation_proposals` are both collected from **iter 1 only** (same `inferred_intent persistence` discipline; iter 2 reads modified content where cluster boundaries may have drifted)
 
 ## Forbidden tool calls
 
@@ -43,6 +45,8 @@ If any of the three criteria is doubtful, do not merge — emit a `structural_no
 
 When multiple entries describe the same pattern (same prescription, same anti-pattern, same fix direction) without one being a class-level extension of the other, merge them into a single entry. If the entries conflict on the prescription (one says X, the other says Y), do not merge — emit a `structural_note` describing the conflict and let the caller resolve.
 
+**Boundary with Consolidation heuristics**: Heuristic 2 fires at any bullet count (typically 2+) when the prescriptions match **exactly verbatim** — same fix direction, no domain variation, no higher-order re-phrasing required (just collapse duplicates). Consolidation heuristics fire only at `≥ min_cluster_size` AND require a **higher-order merged-principle re-phrasing** (variation in surface scope, naming, or domain that needs an abstract main + parenthesized examples form). A 2-bullet near-cluster that would need re-phrasing falls below the Consolidation gate AND outside Heuristic 2's exact-match criterion — leave it alone (do not route via `structural_notes` either; that channel is reserved for prescription conflicts and one-shot incident dropouts, not gate bypass).
+
 ### 3. Example reference extraction
 
 When `.examples.md` contains a full Good/Bad code block for a rule and a separate entry references the same pattern, replace the duplicate full block with a short `See pattern: <name>` reference. Keep the original full block at the first occurrence; the second occurrence becomes the short reference.
@@ -50,6 +54,49 @@ When `.examples.md` contains a full Good/Bad code block for a rule and a separat
 ### 4. One-shot incident dropout
 
 An entry derived from a single past incident, written in highly specific terms, that is now subsumed by another entry's class-level extension may be dropped. Emit such a deletion as a `structural_note` describing the proposed removal and the rationale (which entry now covers the case); the main thread relays this to the user-gate so the user can confirm. Do not emit deletions as `mechanical_edits` — losing an incident-specific entry without user awareness is the highest-risk operation in this mode.
+
+## Consolidation heuristics
+
+These heuristics emit into `consolidation_proposals` only — never into `mechanical_edits`. Detection is gated by `min_cluster_size` (default 3): a cluster qualifies only when its bullet count is **`≥ min_cluster_size`** (`≥`, not `>`). The gate is **binary and non-bypassable** — clusters below `min_cluster_size` MUST NOT be routed to `consolidation_proposals`, `structural_notes`, or `mechanical_edits` as a workaround channel. If a 2-bullet near-cluster looks tempting under `min_cluster_size: 3`, leave it alone. Each proposal carries a merged-principle text plus per-bullet replacement strategies (`delete` or `cross_ref`) so the caller / user-gate can decide whether to apply the merge and how to handle each original bullet.
+
+Run these alongside the four compaction heuristics above, in the same iter-1 pass on the target file. Do not invent new cluster criteria beyond these four.
+
+### 1. Repeated higher-order action
+
+When the file contains multiple bullets that describe the same abstract action in different phrasings (the same underlying discipline applied to different scopes or framings), surface them as a single cluster.
+
+**Closed criteria** — all three must hold:
+
+- (i) The bullets share the same abstract operation or directive (e.g. multiple bullets each prescribing the same sweep-on-extension discipline, multiple bullets each describing the same retry-and-fallback pattern)
+- (ii) The bullets differ in surface scope but not in the underlying rule (the variation is in *where* the action applies, not in *what* the action is)
+- (iii) A higher-order phrasing exists that fits all bullets without losing per-bullet rationale (incident pointers, scope qualifiers can be moved into parenthetical examples)
+
+### 2. Domain-concept phrasing variants
+
+When the file contains multiple bullets describing the same domain concept under different names or aliases (the same idea labeled by multiple terms, with each bullet defining or applying its own term), surface them as one cluster.
+
+**Closed criteria** — both must hold:
+
+- (i) The bullets refer to the same domain concept (the same operational state, the same gate, the same lifecycle event) under different names
+- (ii) The rule each bullet attaches to the concept is consistent across the cluster (if the rules conflict, do not propose a merge — emit each variant as a separate finding or escalate via a `structural_note`)
+
+### 3. Same procedural pattern
+
+When the file contains multiple bullets that describe the same procedural shape across different domains (the same step sequence, the same conditional structure, the same loop / boundary pattern), surface them as one cluster.
+
+**Closed criteria** — both must hold:
+
+- (i) The bullets share the same procedural shape (e.g. multi-step procedures with the same step count and sequence, predicates joining multiple conditions with the same combinator, loops bounded by per-element constraints with the same termination form)
+- (ii) The domain-specific details collapse into parenthetical examples without losing the procedural structure
+
+### 4. Distributed same-anti-pattern bullets
+
+When the file contains multiple bullets each prohibiting the same form (the same "do not collapse X into Y", the same "avoid Z in W context") in different surface contexts, surface them as one cluster.
+
+**Closed criteria** — both must hold:
+
+- (i) The bullets share the same negative form (same anti-pattern, same prohibition)
+- (ii) The proposed merged principle preserves the original prohibition's scope (do not soften the boundary; do not strengthen it beyond the source bullets)
 
 ## Preservation rules
 
@@ -93,6 +140,35 @@ Use `structural_notes` for proposals that are either too risky to mechanize (e.g
 
 > **Per-iter vs aggregated shape asymmetry**: the per-iter response above includes a `file` field on every `structural_notes` entry so the main thread's scope-rail validation can confirm the entry targets the dispatched file. The aggregated form surfaced through SKILL.md Step CP2 (f) and the Step CP4 top-level schema drops `file` (entries become `{description, rationale}`) because each aggregated note already belongs to a per-file record whose `path` field carries the location. The asymmetry is intentional: per-iter needs `file` for validation, per-file rolls up to a single file context already named at the record level.
 
+## `consolidation_proposals` schema
+
+Each entry in `consolidation_proposals` describes one cluster (≥`min_cluster_size` related bullets) with a proposed higher-order principle and per-bullet replacement strategies:
+
+```json
+{
+  "file": "<absolute path to the target file>",
+  "cluster_bullets": [
+    {"line_range": "<L:M>", "snippet": "<verbatim or ≤120-char truncate>"}
+  ],
+  "merged_principle": {
+    "name": "<short noun phrase identifying the higher-order rule>",
+    "text": "<higher-order rule text — abstract main + parenthesized concrete examples form>"
+  },
+  "replacements": [
+    {"line_range": "<L:M>", "strategy": "delete"},
+    {"line_range": "<L:M>", "strategy": "cross_ref", "cross_ref_text": "See pattern: <name>"}
+  ]
+}
+```
+
+- `cluster_bullets` lists the source bullets that the cluster identifies. Each entry's `line_range` is a `<L>:<M>` form pinned to the target file's current line numbers; `snippet` is the bullet's text, ≤120 characters. **Canonical truncation form** (so different subagent runs produce comparable snippets): **tail-truncate** (cut at the end), **no ellipsis marker**, and **preserve the leading bullet prefix verbatim** (`- **label**:` form intact). If the bullet fits in 120 chars, emit it verbatim; otherwise tail-truncate to ≤120 with the leading prefix preserved
+- `merged_principle.name` is a short noun phrase the caller can use as a `cross_ref_text` anchor (typical pattern: a few words capturing the essential discipline). `merged_principle.text` is the proposed higher-order rule body — keep it in the abstract-main + parenthesized-concrete-examples form (see § Distribution-aware fix direction in the dev-workflow bundle's `references/self-retrospective.md` for the canonical phrasing pattern that applies to distributed rule prose). **Materialization disposition**: `merged_principle.text` is **detection output only** — the subagent does **not** emit a `mechanical_edits` entry to insert it into the file. The caller / user-gate decides whether to materialize the merged principle as a new bullet (and where in the file's section structure to place it) when accepting the cluster proposal
+- **Precedence when multiple consolidation heuristics fit**: classify each cluster into **exactly one** entry. If multiple heuristics (1 / 2 / 3 / 4) all fit the same observed cluster, prefer the **lowest-numbered** heuristic for attribution. Do not emit duplicate `consolidation_proposals` entries for the same cluster under different heuristics. The cross-array disjointness rule (§ Contract, "arrays do not share entries") generalizes intra-array as well: one observation → one entry
+- `replacements` lists per-bullet disposition: either `strategy: "delete"` (drop the bullet because the merged principle subsumes it) or `strategy: "cross_ref"` with a `cross_ref_text` field (keep a short pointer to the merged principle in place of the original bullet). The caller / user-gate decides which strategy to apply per bullet; the subagent emits both options where ambiguity exists and a single option where the choice is unambiguous
+- The `file` field must match the dispatch's target file path. The main thread enforces the same scope rail used for `mechanical_edits` / `structural_notes`: any entry whose `file` does not match is skipped without writing
+
+> **Per-iter vs aggregated shape asymmetry**: same convention as `structural_notes` above — the per-iter response includes `file` on every `consolidation_proposals` entry for scope-rail validation; the aggregated form surfaced through SKILL.md Step CP2 (f) and the Step CP4 top-level schema drops `file` (the per-file record's `path` carries the location).
+
 ## Per-iter response schema
 
 Emit a single fenced JSON block at the end of the response, matching the per-iter schema:
@@ -105,15 +181,30 @@ Emit a single fenced JSON block at the end of the response, matching the per-ite
   "structural_notes": [
     {"file": "<path>", "description": "<str>", "rationale": "<str>"}
   ],
+  "consolidation_proposals": [
+    {
+      "file": "<path>",
+      "cluster_bullets": [{"line_range": "<L:M>", "snippet": "<≤120-char>"}],
+      "merged_principle": {"name": "<short noun phrase>", "text": "<higher-order rule text>"},
+      "replacements": [
+        {"line_range": "<L:M>", "strategy": "delete"},
+        {"line_range": "<L:M>", "strategy": "cross_ref", "cross_ref_text": "See pattern: <name>"}
+      ]
+    }
+  ],
   "remaining_edits_count": <int>,
-  "structural_notes_count": <int>
+  "structural_notes_count": <int>,
+  "consolidation_proposals_count": <int>
 }
 ```
 
-- `remaining_edits_count` = `len(mechanical_edits)` — used by the main thread to detect divergence between iters (if iter 2 returns the same `(remaining_edits_count, structural_notes_count)` multiset as iter 1, the loop terminates with per-file `status: "unresolved"`)
+- `remaining_edits_count` = `len(mechanical_edits)` — used by the main thread to detect divergence between iters (if iter 2 returns the same `(remaining_edits_count, structural_notes_count)` multiset as iter 1, the loop terminates with per-file `status: "unresolved"`). `consolidation_proposals_count` is reported for completeness but does **not** participate in the divergence multiset (consolidation_proposals are collected from iter 1 only)
 - `structural_notes_count` = `len(structural_notes)`
+- `consolidation_proposals_count` = `len(consolidation_proposals)`
 
-If no actionable edits remain (the file is already at or below `target_chars`, or the heuristics found no further compactions), return `mechanical_edits: []` and `structural_notes: []`. The main thread will detect this as a no-op iter and decide whether to terminate or continue based on the convergence check (Step CP2 (d) in SKILL.md).
+**Callee-side iter discipline for `consolidation_proposals`**: emit cluster proposals **only on iter 1** (the `--- ITER INFO ---` payload shows the current iter number). On **iter ≥ 2**, return `consolidation_proposals: []` and `consolidation_proposals_count: 0` regardless of what clusters the current file content appears to contain — iter 1's `mechanical_edits` apply may have drifted cluster boundaries, and re-detection at iter 2 yields noise the main thread filters out anyway. The same iter-1-only discipline applies to `structural_notes` (per § Contract). Keep both rules subagent-enforced so the contract is symmetric between the orchestrator (SKILL.md Step CP2 (a)'s note) and this callee contract.
+
+If no actionable edits or proposals remain (the file is already at or below `target_chars`, the cluster heuristics found no qualifying clusters at the resolved `min_cluster_size`, or the heuristics found no further compactions), return `mechanical_edits: []`, `structural_notes: []`, and `consolidation_proposals: []`. The main thread will detect this as a no-op iter and decide whether to terminate or continue based on the convergence check (Step CP2 (d) in SKILL.md).
 
 Emit the JSON block as the final element of your response — no trailing prose, no acknowledgment, no "shall I produce another iter?" sentence. The single JSON block is what the main thread parses.
 
