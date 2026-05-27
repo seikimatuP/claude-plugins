@@ -18,7 +18,7 @@ Every plan produced in Step 2 must follow this structure. Overview, Decisions, D
 
 ### Overview
 - **Goal**: 1 sentence — what the user gets
-- **Difficulty**: Simple | Moderate | Complex (must match the Step 2 difficulty assessment)
+- **Difficulty**: Trivial | Simple | Moderate | Complex (must match the Step 2 difficulty assessment)
 - **Scope**: N files — primary files to touch
 - **Approach**: 1–2 sentences — the chosen strategy
 
@@ -145,6 +145,8 @@ Rendering conventions for the variants below:
 > No user decisions required (subtask scoped — boundaries approved in prior Step 1.5). Full plan details appear above.
 
 Pick exactly one variant and use its literal text verbatim — do not concatenate variants, do not reword the sentence content.
+
+**Trivial-task (N=0) conditional**: when Step 2 assessed the task as **Trivial** (N=0) and Step 3 was therefore skipped, the "The plan has been reviewed in Step 3 ..." sentence is false, and the Step 4 user-approval gate is the sole review of the plan — so this must be signaled regardless of which variant is chosen. Apply per variant: for a variant that **contains** a "The plan has been reviewed in Step 3 ..." sentence, **replace** that sentence with `Step 3 (internal review) was skipped because this task was assessed Trivial — this approval is the sole review.`; for a variant that **contains no** such sentence (the Resume-mode empty-Decisions variant), **append** that same sentence. The lead clause of each variant ("Decisions has items requiring your judgment ..." / "No user decisions required ...") is unchanged in both cases — only the review-status sentence is substituted or appended.
 
 ## Localization granularity
 

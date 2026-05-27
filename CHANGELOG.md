@@ -1,6 +1,10 @@
 # Changelog
 
-## 2026-05-25
+## 2026-05-27
+
+### dev-workflow v1.45.0 / dev-workflow-bundle v1.45.0
+
+- feat(dev-workflow): **Add `Trivial` difficulty tier** (below Simple) to Step 2's difficulty assessment — Trivial tasks (typo, one-line edit, config value change with a single unambiguous solution) now skip Step 3 (Plan Review) and Step 8 (Code Review) entirely (`N = 0`). Simple stays at `N = 1`, Moderate at `N = min(2, N)`, Complex unchanged — the new tier is purely additive, so Simple/Moderate/Complex tasks behave exactly as before. Trivial classification is gated conservatively: only a genuinely self-evident change qualifies, and any doubt (multi-part edit, non-unique fix, approach uncertainty) falls to Simple or above so internal review is retained. Even for Trivial tasks the Step 4 plan-approval gate, Step 7 / 7.5 checks, and `hooks.on_complete` still run, so review is reduced — not eliminated. Step 3 / Step 8 entry points, the Step 7.5→8 GATE, the Step 4 completed-row verification, and the "reviewed in Step 3" prose (SKILL.md / `references/plan-format.md` / README) are all made `N=0`-aware; Step 11.5 (Self-Retrospective) hard-skip and the plan `Difficulty` enum are extended from Simple to Simple/Trivial. Opt out per invocation by passing `-i N` (explicit iteration counts bypass difficulty auto-adjustment as before).
 
 ### dev-workflow v1.44.0 / dev-workflow-bundle v1.44.0
 

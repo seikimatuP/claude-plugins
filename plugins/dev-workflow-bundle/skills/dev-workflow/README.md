@@ -186,9 +186,12 @@ Automatic adjustment by task difficulty (evaluated in Step 2):
 
 | Difficulty | Examples | Effect |
 | --- | --- | --- |
+| Trivial | Typo, one-line edit, config value change (single unambiguous solution) | `N = 0` — Step 3 (Plan Review) & Step 8 (Code Review) skipped entirely |
 | Simple | Typo fix, config tweak, obvious bug fix | `N = 1` |
 | Moderate | Multi-file changes within one module, feature following existing patterns | `N = min(2, N)` |
 | Complex | Cross-module, new patterns, API changes, significant refactoring | Keep configured value |
+
+The **Trivial** tier is classified conservatively: only a genuinely self-evident change with a single unambiguous solution qualifies. Any doubt — a multi-part edit, a non-unique fix, or uncertainty about the approach — falls to Simple or above, so internal review (Step 3 / Step 8) is retained. Even for Trivial tasks the Step 4 plan-approval gate, Step 7 / 7.5 checks, and `hooks.on_complete` still run.
 
 **Exception to Simple**: a change that touches an external library's configuration file or type-level API is classified at least Moderate (not Simple) when the library has had a recent major-version bump. The primary detection is a `git diff` against the base commit on the project's package manifest; when that misses (e.g. the bump landed in a previous task), rely on `git log` on the manifest or conversational context for the same signal. This protects against stale configuration examples being adopted under the Simple heuristic's weakened review iterations.
 
@@ -310,7 +313,7 @@ self_retrospective:
   feedback: "~/retrospectives/dev-workflow"
 ```
 
-**Hard-skip on Simple tasks (overridable on explicit request)**: Step 11.5 is automatically skipped when Step 2 assesses the task as Simple difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple tasks rarely produce meaningful bundle-skill signal. If you later decide the skip was wrong, you can ask the assistant in the same session to "run the retrospective for this run anyway" — the skill will bypass the Simple hard-skip and execute the Step 11.5 procedure without touching TodoWrite. Cross-session re-runs are not supported.
+**Hard-skip on Simple/Trivial tasks (overridable on explicit request)**: Step 11.5 is automatically skipped when Step 2 assesses the task as Simple or Trivial difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple/Trivial tasks rarely produce meaningful bundle-skill signal. If you later decide the skip was wrong, you can ask the assistant in the same session to "run the retrospective for this run anyway" — the skill will bypass the Simple/Trivial hard-skip and execute the Step 11.5 procedure without touching TodoWrite. Cross-session re-runs are not supported.
 
 **User preview + approval is always required**. Before submission, the assembled body is shown to the user along with a destination header (mode / resolved value / settings layer source). The user can `approve`, `edit` (revise inline), or `skip`. In repo mode, an additional explicit confirmation of `<owner/repo>` is asked before the `gh api` POST runs — this is a defense against a malicious commit to the git-tracked `.claude/dev-workflow.md` silently redirecting retrospectives.
 
@@ -473,17 +476,17 @@ The workflow begins at Step 2 (Step 1 is settings load, Step 1.5 is task decompo
 | 1 | Load Settings | Load config, resolve iteration count, register TodoWrite |
 | 1.5 | Task Decomposition | (Normal sub-mode, only when `task_decomposition: true`) Decide whether to split the task into subtasks and, if approved, create a state file. (Resume sub-mode) Load the state file and pick the next subtask — the step is executed but not registered as a TodoWrite entry. Skipped entirely when `task_decomposition: false` |
 | 2 | Create Plan | Create plan in Plan Mode, assess difficulty |
-| 3 | Plan Review | Internal review by reviewer (up to N iterations) |
+| 3 | Plan Review | Internal review by reviewer (up to N iterations; skipped entirely for Trivial tasks, N=0) |
 | 4 | Finalize Plan | **User approval gate** |
 | 5 | Implement | Follow the plan |
 | 6 | Tidy | Reduce complexity via `tidy` skill |
 | 7 | Check / Test | Run check_commands + run-tests |
 | 7.5 | Rules Compliance Review | Verify `.claude/rules/` compliance via `rules-review` skill |
-| 8 | Code Review | Code review by reviewer (up to N iterations) |
+| 8 | Code Review | Code review by reviewer (up to N iterations; skipped entirely for Trivial tasks, N=0) |
 | 9 | Completion Hooks | Run `hooks.on_complete` (only if configured) |
 | 10 | Interactive Commits | (Only when `interactive_commits: true`) Group working-tree changes into commits and iterate per-commit with the user. The workflow never pushes — that stays the user's responsibility |
 | 11 | Update Rules | Update rules via `extract-rules`. Sub-step 3 (Char-count compaction gate) runs only when `compact_rules: true` (experimental, opt-in) |
-| 11.5 | Self-Retrospective | (Only if `self_retrospective.feedback` is set and difficulty is not Simple; or manually re-requested in the same session after a Simple auto-skip) Spawn a subagent to extract sanitized bundle-skill improvement signal, present it with a destination header, and submit on user approval. See `references/self-retrospective.md` |
+| 11.5 | Self-Retrospective | (Only if `self_retrospective.feedback` is set and difficulty is not Simple or Trivial; or manually re-requested in the same session after a Simple/Trivial auto-skip) Spawn a subagent to extract sanitized bundle-skill improvement signal, present it with a destination header, and submit on user approval. See `references/self-retrospective.md` |
 
 ## Plan format
 
@@ -512,7 +515,7 @@ In Resume mode, subtask boundaries, order, and purposes were already approved in
 1. Read Overview (≤ 30 seconds).
 2. Read the guidance line at the top of the plan — Step 4 leads with one of three literal lines that tell you where to focus.
 3. If Decisions has items, engage with each one (the real work). If Decisions is empty, approve after a light skim.
-4. The rest of the plan has already been reviewed in Step 3 by the reviewer skill — skim only if something looks off.
+4. The rest of the plan has already been reviewed in Step 3 by the reviewer skill — skim only if something looks off. (Exception: for a Trivial task, N=0, Step 3 is skipped and the plan is unreviewed — read it carefully before approving.)
 
 ## Prerequisites
 
