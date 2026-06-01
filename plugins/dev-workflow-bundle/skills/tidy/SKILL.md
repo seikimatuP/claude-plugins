@@ -1,7 +1,7 @@
 ---
 name: tidy
 description: Review changed code for reuse, quality, and efficiency, then apply cleanup edits. Dispatches a fresh subagent per iteration to surface mechanical cleanup edits and structural notes; the main thread applies the edits and re-dispatches until the subagent declares no further edits. Non-interactive — no user prompts. Use after implementation as a code-cleanup pass complementary to correctness review.
-allowed-tools: Read, Edit, Agent, TodoWrite, Bash(git diff *), Bash(git status *), Bash(git checkout HEAD -- *)
+allowed-tools: Read, Edit, Agent, TaskCreate, TaskUpdate, TodoWrite, Bash(git diff *), Bash(git status *), Bash(git checkout HEAD -- *)
 ---
 
 # Tidy
@@ -54,9 +54,9 @@ For each entry in `changed_files`, in the main thread:
 
 ### Step 3 — Iteration loop (i = 1 .. Max iterations)
 
-**Pre-register iteration TodoWrite items** — before entering the loop, create `iteration 1`, `iteration 2`, ..., `iteration <Max iterations>` TodoWrite items. Mark `in_progress` before each dispatch, `completed` after parse + apply (a converged iteration marks `completed` immediately after parsing). On early convergence (no `mechanical_edits` returned) or safety-rail-triggered exit, mark remaining iteration items `completed` with note appended to the item's `content` field as `— skipped: converged` / `— skipped: <reason>`. Pre-registration is load-bearing: without it, the executor-driven loop tends to stop at the first iteration that looks acceptable.
+**Pre-register iteration tasks** — before entering the loop, `TaskCreate` one task per iteration with subject `iteration 1`, `iteration 2`, ..., `iteration <Max iterations>`. Mark `in_progress` (via `TaskUpdate`) before each dispatch, `completed` after parse + apply (a converged iteration marks `completed` immediately after parsing). On early convergence (no `mechanical_edits` returned) or safety-rail-triggered exit, mark remaining iteration tasks `completed` with the skip note recorded in the task's `description` field (the `content` field under the `TodoWrite` fallback) as `— skipped: converged` / `— skipped: <reason>`. Pre-registration is load-bearing: without it, the executor-driven loop tends to stop at the first iteration that looks acceptable.
 
-**TodoWrite unavailable fallback**: when the executor's tool set lacks `TodoWrite` (e.g., the skill runs inside a nested subagent context where progress-tracking tools were not surfaced), skip the pre-registration step and hold iteration state (current `i`, cumulative `applied_edits_count`, `notes_remaining_count`, accumulated `out_of_scope`, `reverted_paths`) in main-thread context instead. `TodoWrite` is progress-tracking, not correctness-critical — the loop semantics in (a)–(c) are unaffected. Same shape as the `Agent unavailable fallback` in (a).
+**Task tools unavailable fallback**: when the executor's tool set lacks the Task tools (`TaskCreate` / `TaskUpdate`), use the equivalent `TodoWrite` operations if it is present (e.g. the VSCode extension, or Claude Code before v2.1.142) — the status values and pre-register semantics are identical, and `allowed-tools` grants both. If **neither** the Task tools nor `TodoWrite` is surfaced (e.g. the skill runs inside a nested subagent context where progress-tracking tools were not surfaced), skip the pre-registration step and hold iteration state (current `i`, cumulative `applied_edits_count`, `notes_remaining_count`, accumulated `out_of_scope`, `reverted_paths`) in main-thread context instead. Progress tracking is not correctness-critical — the loop semantics in (a)–(c) are unaffected. Same shape as the `Agent unavailable fallback` in (a).
 
 #### (a) Dispatch reviewer Agent
 

@@ -202,7 +202,7 @@ If `-i N` is explicitly specified, auto-adjustment is skipped. The configured va
 Controls whether Step 1.5 runs the auto-decomposition check in Normal sub-mode.
 
 - `true` (default): the current behavior — large, multi-concern tasks get a decomposition proposal presented to the user
-- `false`: Step 1.5 is omitted from TodoWrite and the decomposition judgment is skipped entirely. Normal sub-mode requests (`/dev-workflow <task>`) go straight to Step 2 as a single task
+- `false`: Step 1.5 is omitted from the task list and the decomposition judgment is skipped entirely. Normal sub-mode requests (`/dev-workflow <task>`) go straight to Step 2 as a single task
 
 ```yaml
 task_decomposition: false
@@ -217,7 +217,7 @@ Non-boolean values are ignored with a warning and fall back to `true`.
 Controls whether Step 10 (Interactive Commits) runs after `hooks.on_complete` (Step 9).
 
 - `true` (default): after Step 9, the workflow inspects the working tree, proposes a commit grouping (subjects + file lists), waits for user approval, then iterates per-commit — presenting subject / body / diff for each commit, staging via explicit pathspecs, and committing with a HEREDOC. The workflow itself never pushes — that stays the user's responsibility
-- `false`: Step 10 is omitted from TodoWrite and never executes. The workflow ends with an uncommitted tree as before — commit and push manually after the run
+- `false`: Step 10 is omitted from the task list and never executes. The workflow ends with an uncommitted tree as before — commit and push manually after the run
 
 ```yaml
 interactive_commits: false
@@ -313,7 +313,7 @@ self_retrospective:
   feedback: "~/retrospectives/dev-workflow"
 ```
 
-**Hard-skip on Simple/Trivial tasks (overridable on explicit request)**: Step 11.5 is automatically skipped when Step 2 assesses the task as Simple or Trivial difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple/Trivial tasks rarely produce meaningful bundle-skill signal. If you later decide the skip was wrong, you can ask the assistant in the same session to "run the retrospective for this run anyway" — the skill will bypass the Simple/Trivial hard-skip and execute the Step 11.5 procedure without touching TodoWrite. Cross-session re-runs are not supported.
+**Hard-skip on Simple/Trivial tasks (overridable on explicit request)**: Step 11.5 is automatically skipped when Step 2 assesses the task as Simple or Trivial difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple/Trivial tasks rarely produce meaningful bundle-skill signal. If you later decide the skip was wrong, you can ask the assistant in the same session to "run the retrospective for this run anyway" — the skill will bypass the Simple/Trivial hard-skip and execute the Step 11.5 procedure without touching the task list. Cross-session re-runs are not supported.
 
 **User preview + approval is always required**. Before submission, the assembled body is shown to the user along with a destination header (mode / resolved value / settings layer source). The user can `approve`, `edit` (revise inline), or `skip`. In repo mode, an additional explicit confirmation of `<owner/repo>` is asked before the `gh api` POST runs — this is a defense against a malicious commit to the git-tracked `.claude/dev-workflow.md` silently redirecting retrospectives.
 
@@ -362,7 +362,7 @@ self_retrospective:
 
 Large requests that span multiple independent concerns can be split into subtasks (each delivered as its own PR), and resumed across sessions.
 
-> **Disabling the auto check**: Set `task_decomposition: false` in your settings file to skip the Step 1.5 judgment entirely. Tasks are always treated as single-task runs, and Step 1.5 is omitted from TodoWrite. `--resume <state-file>` still works on existing state files.
+> **Disabling the auto check**: Set `task_decomposition: false` in your settings file to skip the Step 1.5 judgment entirely. Tasks are always treated as single-task runs, and Step 1.5 is omitted from the task list. `--resume <state-file>` still works on existing state files.
 
 ### How it works
 
@@ -473,8 +473,8 @@ The workflow begins at Step 2 (Step 1 is settings load, Step 1.5 is task decompo
 
 | Step | Name | Content |
 | --- | --- | --- |
-| 1 | Load Settings | Load config, resolve iteration count, register TodoWrite |
-| 1.5 | Task Decomposition | (Normal sub-mode, only when `task_decomposition: true`) Decide whether to split the task into subtasks and, if approved, create a state file. (Resume sub-mode) Load the state file and pick the next subtask — the step is executed but not registered as a TodoWrite entry. Skipped entirely when `task_decomposition: false` |
+| 1 | Load Settings | Load config, resolve iteration count, register workflow tasks |
+| 1.5 | Task Decomposition | (Normal sub-mode, only when `task_decomposition: true`) Decide whether to split the task into subtasks and, if approved, create a state file. (Resume sub-mode) Load the state file and pick the next subtask — the step is executed but not registered as a task entry. Skipped entirely when `task_decomposition: false` |
 | 2 | Create Plan | Create plan in Plan Mode, assess difficulty |
 | 3 | Plan Review | Internal review by reviewer (up to N iterations; skipped entirely for Trivial tasks, N=0) |
 | 4 | Finalize Plan | **User approval gate** |

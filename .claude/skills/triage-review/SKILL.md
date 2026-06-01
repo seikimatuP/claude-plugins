@@ -1,7 +1,7 @@
 ---
 name: triage-review
 description: Daily review of the latest origin triage-* branch. Operator-prepared invariant — the operator fetches origin and switches the local repository to the triage branch before invocation. The skill verifies that the current branch matches `triage-*`, then dispatches `Skill(prompt-tuning)` per prompt-eligible changed file, `Skill(skill-review)` with `Base ref: main`, and `Skill(publicity-review)` with `Base ref: main` in sequence, finally emits a summary. Project-local routine — not for marketplace distribution.
-allowed-tools: TodoWrite, Skill(prompt-tuning), Skill(skill-review), Skill(publicity-review), Bash(git rev-parse *), Bash(git symbolic-ref *), Bash(git status --porcelain*), Bash(git diff *)
+allowed-tools: TaskCreate, TaskUpdate, TodoWrite, Skill(prompt-tuning), Skill(skill-review), Skill(publicity-review), Bash(git rev-parse *), Bash(git symbolic-ref *), Bash(git status --porcelain*), Bash(git diff *)
 ---
 
 # Triage Review
@@ -10,7 +10,7 @@ Daily local review of the latest `dev-workflow-triage` output branch. After `dev
 
 ## No-Stall Principle
 
-The generic regimen (sub-skill return discipline, Step-boundary non-stalling, TodoWrite phase transitions, intentional reinforcement-by-repetition for inline reminders, fatal tool-level errors out of scope) is defined in `.claude/skills/dev-workflow-triage/SKILL.md` § No-Stall Principle and applies here without modification. The skill-specific deltas below override or extend that canonical regimen.
+The generic regimen (sub-skill return discipline, Step-boundary non-stalling, phase / per-issue status transitions, intentional reinforcement-by-repetition for inline reminders, fatal tool-level errors out of scope) is defined in `.claude/skills/dev-workflow-triage/SKILL.md` § No-Stall Principle and applies here without modification. The skill-specific deltas below override or extend that canonical regimen.
 
 **Zero designed user-gate points.** This routine has **no** user-judgment gates between Step 1 Pre-flight and Step 6 summary emission. Every sub-skill return — per-file `Skill(prompt-tuning)`, `Skill(skill-review)`, `Skill(publicity-review)` — is a return value to parse-and-proceed-past, never a checkpoint to confirm with the user. The only user-facing output is the Step 6 summary at the end. Specifically forbidden between any two sub-skill dispatches and between the final sub-skill return and Step 6 summary emission: user-facing pause phrases (`なにか判断が必要ですか？` / `判断を求めていますか？` / `X ファイル目完了。続けますか？` / `次は <step> です` framing without immediately issuing the next tool call / English equivalents such as `shall I proceed?` / `does this need your judgment?`), prose that ends a response without a subsequent tool call when more dispatches remain, and any framing that surfaces a sub-skill's return as a deliverable mid-loop. If you find yourself drafting such prose, that is precisely the anti-pattern this routine forbids — emit the next tool call in the same response instead. See § No-Stall Principle in `.claude/skills/dev-workflow-triage/SKILL.md` for the canonical Stall mitigation pattern (callee-side fenced JSON + orchestrator-side pre/return-point reminders).
 

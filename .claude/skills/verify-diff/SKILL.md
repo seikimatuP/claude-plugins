@@ -1,7 +1,7 @@
 ---
 name: verify-diff
 description: Empirically verify that a code diff achieves its stated objective by dispatching a bias-free executor that actually runs auto-derived evaluation scenarios against the post-diff file. The executor returns a JSON verdict with `suggested_edits`, and this skill applies them iteratively until the executor declares no further fixes are needed, max-iterations is reached, or a safety rail trips. Non-interactive — no user prompts. Use after applying an Edit when you need a dynamic cross-check that complements static reviewers like skill-review.
-allowed-tools: Read, Edit, Agent, TodoWrite, Bash(git diff *), Bash(git checkout HEAD -- *)
+allowed-tools: Read, Edit, Agent, TaskCreate, TaskUpdate, TodoWrite, Bash(git diff *), Bash(git checkout HEAD -- *)
 ---
 
 # Verify Diff
@@ -62,9 +62,9 @@ Triggered when `Description`, `Suggested fix direction`, and `Target file` are *
 
 ### A2. Per-skill dispatch
 
-Auto-derive pre-registers `N skills × Max iterations` TodoWrite rows total, namespaced by `<skill>`. For each `(skill, files)` pair in `skill_groups`:
+Auto-derive pre-registers `N skills × Max iterations` task rows total, namespaced by `<skill>`. For each `(skill, files)` pair in `skill_groups`:
 
-1. **Pre-register iteration TodoWrite items** named `<skill> iter 1` … `<skill> iter <Max iterations>` following the same protocol as `## Workflow` § Step 3 pre-registration (mark `in_progress` before dispatch, `completed` after parse + apply, append `— skipped: <reason>` on early exit).
+1. **Pre-register iteration tasks** — `TaskCreate` one task per iteration named `<skill> iter 1` … `<skill> iter <Max iterations>` following the same protocol as `## Workflow` § Step 3 pre-registration (mark `in_progress` via `TaskUpdate` before dispatch, `completed` after parse + apply, append `— skipped: <reason>` on early exit).
 2. **Primary file selection** — pick `primary_file` = `<skill-dir>/SKILL.md` if it appears in `files`; otherwise the first entry in `files` sorted lexicographically. This choice only labels the per-skill verdict's `primary_file` field for human-readable anchoring and influences the dispatch payload's framing — it does **not** affect per-skill verdict semantics (`status` / `applied_edits_count` / `objective_met` etc.), which are emitted for the whole `files` set.
 3. **Per-iter snapshot** — on iter 1, `Read` the full current contents of every entry in `files` (per-iter snapshot) and run `git diff <Base ref> -- <files>` to capture the per-skill diff. The A1 (1) full-tree diff is used **only for skill-prefix splitting in A1** and is not forwarded to the dispatch payload; the `--- DIFF ---` payload carries the per-skill diff only, keeping main-thread context bounded. On `i ≥ 2`, only re-`Read` the subset of `files` whose path appeared in a successfully-applied `suggested_edits` entry during iter `i-1` (untouched files keep their iter-1 snapshot — wasted work otherwise, same convention as `publicity-review` § Step 2 (a)) and re-run `git diff <Base ref> -- <files>` so the per-skill diff reflects edits that landed in prior iterations.
 4. **Dispatch payload assembly** — invoke the `Agent` tool to dispatch a fresh executor. Assemble the dispatch prompt from the four sections below, each framed with a clear `--- LABEL ---` fence (same convention as `## Workflow` § Step 3 (a) Dispatch bias-free executor and sibling Pattern A skills `publicity-review` / `skill-review`):
@@ -177,7 +177,7 @@ Generate 1–2 evaluation scenarios plus a requirements checklist from the calle
 
 ### Step 3 — Iteration loop (i = 1 .. Max iterations)
 
-**Pre-register iteration TodoWrite items** — before entering the loop, create `iteration 1`, `iteration 2`, ..., `iteration <Max iterations>` TodoWrite items. Mark `in_progress` before each dispatch, `completed` after parse+apply (for a `converged` verdict, "apply" is a no-op — mark `completed` immediately after parsing the verdict). On early convergence (verdict matches the converged rule) or safety-rail triggered exit (`skipped` / `conflict`), mark remaining iteration items `completed` with note matching the exit reason (e.g. `skipped: converged at iter 2`). The "note" lives in the TodoWrite item's `content` field — append as `— <reason>`; TodoWrite has no dedicated note field. Pre-registration is load-bearing: without it, the executor-driven loop tends to stop after the first iteration that looks acceptable, even when gaps remain that further iterations could close.
+**Pre-register iteration tasks** — before entering the loop, `TaskCreate` one task per iteration named `iteration 1`, `iteration 2`, ..., `iteration <Max iterations>`. Mark `in_progress` (via `TaskUpdate`) before each dispatch, `completed` after parse+apply (for a `converged` verdict, "apply" is a no-op — mark `completed` immediately after parsing the verdict). On early convergence (verdict matches the converged rule) or safety-rail triggered exit (`skipped` / `conflict`), mark remaining iteration tasks `completed` with note matching the exit reason (e.g. `skipped: converged at iter 2`). The "note" lives in the task's `description` field (the `content` field under the `TodoWrite` fallback) — append as `— <reason>`. Where the Task tools are unavailable (e.g. the VSCode extension, or Claude Code before v2.1.142), use the equivalent `TodoWrite` operations instead — the status values and pre-register semantics are identical; `allowed-tools` grants both. Pre-registration is load-bearing: without it, the executor-driven loop tends to stop after the first iteration that looks acceptable, even when gaps remain that further iterations could close.
 
 #### (a) Dispatch bias-free executor
 
