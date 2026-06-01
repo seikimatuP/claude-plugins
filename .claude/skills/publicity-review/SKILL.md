@@ -1,7 +1,7 @@
 ---
 name: publicity-review
 description: Review uncommitted diff for content unsuitable for publication to a public repository — secrets/credentials, user-specific absolute paths, internal-only URLs/hostnames, and personal identifiers. Each iteration dispatches a fresh subagent that returns findings; the main thread applies the subagent's mechanical fixes and re-dispatches until the subagent declares no remaining findings or max iterations is reached. Non-interactive — no user prompts. Use as a final gate before publishing changes; designed to be called from non-interactive routines such as dev-workflow's hooks.on_complete or dev-workflow-triage's per-Finding sub-flow.
-allowed-tools: Read, Edit, Agent, TodoWrite, Bash(git diff *), Bash(git rev-parse *), Bash(git checkout HEAD -- *)
+allowed-tools: Read, Edit, Agent, TaskCreate, TaskUpdate, TodoWrite, Bash(git diff *), Bash(git rev-parse *), Bash(git checkout HEAD -- *)
 ---
 
 # Publicity Review
@@ -37,7 +37,7 @@ There is no explicit pre-flight diff-size cap — sibling review skills (`ask-pe
 
 ### Step 2 — Iteration loop (i = 1 .. Max iterations)
 
-**Pre-register iteration TodoWrite items** — before entering the loop, create `iteration 1`, ..., `iteration <Max iterations>` items. Mark `in_progress` before each dispatch, `completed` after parse + apply (a `converged` verdict marks `completed` immediately after parsing). On early convergence or safety-rail exit, mark remaining items `completed` with note appended to the item's `content` field as `— skipped: <reason>`.
+**Pre-register iteration tasks** — before entering the loop, `TaskCreate` one task per iteration named `iteration 1`, ..., `iteration <Max iterations>`. Mark `in_progress` (via `TaskUpdate`) before each dispatch, `completed` after parse + apply (a `converged` verdict marks `completed` immediately after parsing). On early convergence or safety-rail exit, mark remaining tasks `completed` with note appended to the task's `description` field (the `content` field under the `TodoWrite` fallback) as `— skipped: <reason>`. Where the Task tools are unavailable (e.g. the VSCode extension, or Claude Code before v2.1.142), use the equivalent `TodoWrite` operations instead — the status values and pre-register semantics are identical; `allowed-tools` grants both.
 
 #### (a) Dispatch reviewer Agent
 
