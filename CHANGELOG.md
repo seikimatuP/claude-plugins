@@ -6,6 +6,11 @@
 
 - fix(ask-peer): add session-loaded primary-source verification clause to Planning Focus (auto-triage #54)
   - Category: other; Reviewer's Planning audit list had no clause directing the reviewer to consult session-available primary sources (loaded tool schemas, the run's own successful invocations, file declarations the reviewer can read) before reporting absence as a hypothesis to challenge — false-positive findings cost an orchestrator round-trip to re-cite the same source already in scope. New clause inserted before `internal reference-doc sample-code verification` with explicit boundary disambiguation; principle abstract + skill-development examples in parentheses per distribution rule.
+- refactor(ask-peer): split Planning / Code Review-Focus run-on bullets into nested lists (behavior unchanged, clause wording verbatim)
+  - Readability / diff-reviewability: the Planning Review-Focus bullet was a single semicolon-joined run-on of ~15 named audit clauses (and the Code bullet appended one more); split each clause into its own nested bullet so diffs no longer collapse to a one-line replacement and clause coverage is scannable. Verified verbatim-preserving (rejoining the nested bullets with `; ` reproduces the prior lines byte-for-byte); the canonical and dev-workflow-bundle copies were updated in sync.
+- fix(ask-peer): add dispatch-unavailable inline fallback to Process + single-shot review degenerate-case handling (CHANGELOG backfill for the commit "enhance process description for subagent dispatch and feedback handling")
+  - Category: missing-branch; Process step 1 assumed subagent dispatch is always available — added a fallback directing the main thread to adopt the Peer Agent Personality inline when the `Agent` tool is absent or nested dispatch is blocked.
+  - Category: ambiguity; the "confirm Issue / Goal / Constraints first" checklist read as a blocking gate with no single-shot guidance — added a bullet directing the reviewer to state working assumptions inline and proceed when no round-trip channel exists.
 
 ### dev-workflow v1.47.1 / dev-workflow-bundle v1.47.1
 
