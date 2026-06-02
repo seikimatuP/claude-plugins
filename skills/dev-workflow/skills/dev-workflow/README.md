@@ -313,7 +313,7 @@ self_retrospective:
   feedback: "~/retrospectives/dev-workflow"
 ```
 
-**Hard-skip on Simple/Trivial tasks (overridable on explicit request)**: Step 11.5 is automatically skipped when Step 2 assesses the task as Simple or Trivial difficulty (typo fix, config tweak, obvious bug fix), regardless of this setting — Simple/Trivial tasks rarely produce meaningful bundle-skill signal. If you later decide the skip was wrong, you can ask the assistant in the same session to "run the retrospective for this run anyway" — the skill will bypass the Simple/Trivial hard-skip and execute the Step 11.5 procedure without touching the task list. Cross-session re-runs are not supported.
+**Runs regardless of task difficulty**: Step 11.5 runs whenever `self_retrospective.feedback` is configured, independent of the Step 2 difficulty assessment. Difficulty gates only the review-iteration count N (Step 3 / Step 8) — it does **not** gate the self-retrospective. Even Simple/Trivial tasks produce a retrospective when `feedback` is set — when nothing notable surfaced, it is simply short.
 
 **User preview + approval is always required**. Before submission, the assembled body is shown to the user along with a destination header (mode / resolved value / settings layer source). The user can `approve`, `edit` (revise inline), or `skip`. In repo mode, an additional explicit confirmation of `<owner/repo>` is asked before the `gh api` POST runs — this is a defense against a malicious commit to the git-tracked `.claude/dev-workflow.md` silently redirecting retrospectives.
 
@@ -486,7 +486,7 @@ The workflow begins at Step 2 (Step 1 is settings load, Step 1.5 is task decompo
 | 9 | Completion Hooks | Run `hooks.on_complete` (only if configured) |
 | 10 | Interactive Commits | (Only when `interactive_commits: true`) Group working-tree changes into commits and iterate per-commit with the user. The workflow never pushes — that stays the user's responsibility |
 | 11 | Update Rules | Update rules via `extract-rules`. Sub-step 3 (Char-count compaction gate) runs only when `compact_rules: true` (experimental, opt-in) |
-| 11.5 | Self-Retrospective | (Only if `self_retrospective.feedback` is set and difficulty is not Simple or Trivial; or manually re-requested in the same session after a Simple/Trivial auto-skip) Spawn a subagent to extract sanitized bundle-skill improvement signal, present it with a destination header, and submit on user approval. See `references/self-retrospective.md` |
+| 11.5 | Self-Retrospective | (Only if `self_retrospective.feedback` is set; runs regardless of task difficulty) Spawn a subagent to extract sanitized bundle-skill improvement signal, present it with a destination header, and submit on user approval. See `references/self-retrospective.md` |
 
 ## Plan format
 
