@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-02
+
+### dev-workflow v1.48.0 / dev-workflow-bundle v1.48.0
+
+- feat(dev-workflow): **Behavior change — Step 11.5 (Self-Retrospective) now runs regardless of task difficulty** — Step 11.5 fires on every run where `self_retrospective.feedback` is configured, including Simple/Trivial tasks that previously hard-skipped it. The Step 2 difficulty assessment now gates only the review-iteration count N (Step 3 / Step 8); it no longer gates the self-retrospective. Resolves dev-workflow-issues #55 (remove the Simple/Trivial hard-skip rather than add an opt-out flag) and #56 (separate the two concerns the difficulty assessment was gating). Removed the now-dead "Manual re-run (same-session only)" path — its only trigger, recovery from an auto-skip, no longer exists — while preserving the multi-instance jsonl-mismatch safeguard in `references/self-retrospective.md` §1.4. Swept all 11 difficulty-gating sites across SKILL.md / README.md / `references/self-retrospective.md` (canonical + dev-workflow-bundle copy). **For existing users**: a project with `self_retrospective.feedback` set will now see the Step 11.5 preview + approval gate at the end of Simple/Trivial runs.
+
 ## 2026-06-01
 
 ### ask-peer v2.2.9 / dev-workflow-bundle v1.47.1
