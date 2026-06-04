@@ -589,6 +589,8 @@ The compaction reminder is omitted when `compaction_applied_count == 0` AND `bel
 
 **If this run was executing a subtask from a decomposition state file**, also do the following (all reads/writes target the canonical state-file path recorded in Step 1.5):
 
+**Execution-time deferral/exclusion gate**: before marking the subtask as completed, check whether any in-scope work items were excluded, deferred, or discovered as unassigned during implementation or testing. Items recorded only in prose (Risks entries, inline notes) are invisible to `--resume` and will be silently skipped — each such item must be promoted to a tracked subtask entry in the state file before completion is declared. For each uncovered item, get user approval on one of: (a) add as a new pending subtask with a `depends_on` link if sequencing matters, (b) fold into an existing pending subtask's scope, or (c) explicitly accept as permanently out of parent-task scope. The completion report must confirm that no goal-required items remain in untracked prose form.
+
 1. Mark the current subtask's `status` as `completed` in the canonical state file and write back
 2. Ask the user for an optional PR URL for this subtask. On a non-empty answer, set the subtask's `pr` field and write back; otherwise leave it `null`
 3. Refresh the parent-task progress row's `<done>/<total>` count
