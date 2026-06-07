@@ -59,6 +59,11 @@ Look for user preferences and classify them:
    - Code added by following an established codebase pattern without user guidance or correction — symmetric code duplication, template expansion, mechanical extension of an existing structure
    - Extract only when a new design decision was made, an exceptional case was handled, or the user explicitly corrected or redirected the approach
 
+**5. Ordering/sequencing rules from observed session execution** → Self-check before staging:
+   - Ask: does this rule reflect an intentional, repeatable preference, or merely the order in which actions happened to be sequenced in this run?
+   - If incidental (e.g., one file was updated before another as a side effect of task structure, not a deliberate convention), capture the underlying invariant ("shared dependency versions must stay aligned") instead of the directional rule ("always update X before Y")
+   - When the direction cannot be confirmed as intentional, annotate the staged entry as needing direction confirmation rather than staging it as a prescriptive rule (e.g., prefix with `[NEEDS DIRECTION CONFIRMATION]` in the staged text)
+
 ## Step C5: Append Principles and Patterns
 
 1. **Read existing rule files**: read the rule files to understand current rules. The dedup logic operates over two separately-tagged file-sets: `canonical_files` (rule files under `output_dir` plus `.examples.md` files under `examples_output_dir` — the existing dedup target) and `staging_files` (the project-level staging file under `staging_output_dir` — for the staging-match branch added in the "Check for duplicates and route per category" step below). In Conversation mode these are passed via the Step C2 subagent prompt boundary; in PR Review mode and Update Mode (both defer to this Step C5 for the staging-match criterion) the main agent reads both file-sets directly with no prompt boundary — the tagging is conceptual in those cases.
