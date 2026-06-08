@@ -67,7 +67,23 @@ Use the `Agent` tool (`subagent_type: general-purpose`). Embed the following in 
 Instruct the subagent to:
 
 1. Read §2 (signal types, candidate schema) and §3 (sanitization rules) of the reference file.
-2. Parse the session jsonl (line-delimited JSON — each line one message). Extract `user` and `assistant` text content. Skip `tool_use`, `thinking`, and similar internal blocks. A short `jq` or inline node/python is fine.
+2. Parse the session jsonl (line-delimited JSON — each line one message). Extract:
+   - `user` and `assistant` **text** content (skip `tool_use`, `thinking`, and similar internal blocks)
+   - Each entry's `timestamp` field (ISO 8601 string at the top level of the JSON line)
+   - Each `assistant` entry's `message.usage` object (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`)
+
+   A short `jq` or inline node/python is fine. Entries missing `timestamp` or `message.usage` are skipped for interval computation — use the gap between the nearest surrounding valid entries instead.
+
+2a. **Interval computation.** From the extracted timestamps and usage data, compute two kinds of interval metrics:
+   - **Wall-clock intervals**: timestamp differences between consecutive `assistant` entries (in seconds). The gap immediately before a `user` entry (from the last `assistant` entry's timestamp to the next `user` entry's timestamp) represents user idle time and is excluded from step-duration estimates. When a `user` entry sits between two `assistant` entries, do not treat the whole assistant-to-assistant span as one work interval — split it into the (assistant → user) idle leg, which is excluded, and the (user → next assistant) resume leg, which counts; only the resume leg contributes to step duration.
+   - **Token consumption per phase**: cumulative `output_tokens` between consecutive `user` messages as the unit of measurement.
+
+   **Minimum data requirement**: if fewer than 2 `assistant` entries carry a valid `timestamp`, skip interval computation entirely and proceed with signal detection (§2.2 Signal types) based on text content alone — do not report an error.
+
+   Step attribution is inherently coarse — the subagent infers rough phase boundaries from text content (step-number mentions, skill names in prose). Precise per-step attribution is not required; identifying the dominant time/token sinks (e.g. Step 3 ≈130s, Step 7 ≈120s magnitude) is sufficient.
+
+   When generating findings for Token-consumption inefficiency or Development-speed friction signals (§2.2), cite the approximate interval duration or token count directly in the finding's `description` paragraph as grounding evidence (e.g. "approximately 130 seconds", "roughly 25k output tokens").
+
 3. Scan for the signal types in §2.2.
 4. Apply §3 sanitization to each candidate's `description` and `suggested fix direction` **before** returning.
 5. **Language handling**: write the `Description` and `Suggested fix direction` paragraphs in the provided language. All other tokens — `### Finding <N>` headings, `**Target skill:**` / `**Category:**` / `**Description:**` / `**Suggested fix direction:**` label names, the enum values for Target skill and Category, the trailing `Findings: <N>` line, and the `Status: ERROR` shape — remain English exactly as shown. Sanitization (§3) applies to the localized prose regardless of language.
@@ -106,14 +122,14 @@ Instruct the subagent to:
 - **Workflow stalls / loops** — a workflow step ran multiple times without progress, or the skill looped on a decision
 - **Rejected skill outputs** — the user explicitly rejected what a skill produced
 - **Ambiguity surfacing in reviews** — Step 3 / Step 8 peer reviews pointed at SKILL.md wording as the root cause of a mistake
-- **Token-consumption inefficiency** — a workflow step spent tokens wastefully (re-reading the same file across turns, re-deriving a value already present in context, dispatching a subagent for work the main thread already held, emitting long redundant prose) and the skill could have avoided it
-- **Development-speed friction** — a step took disproportionately long in wall-clock time or round-trips and the skill could shorten it **without lowering output quality** (a sequential dispatch that could run concurrently, a gate that fired when it did not need to, an avoidable re-run) — never by dropping review or verification coverage
+- **Token-consumption inefficiency** — a workflow step spent tokens wastefully (re-reading the same file across turns, re-deriving a value already present in context, dispatching a subagent for work the main thread already held, emitting long redundant prose) and the skill could have avoided it. When timestamp and usage data are available from the session jsonl (§2.1 Spawn the subagent, step 2), ground the assessment in measured `output_tokens` per interval rather than relying solely on qualitative observation
+- **Development-speed friction** — a step took disproportionately long as measured by timestamp intervals between assistant entries, or required excessive round-trips, and the skill could shorten it **without lowering output quality** (a sequential dispatch that could run concurrently, a gate that fired when it did not need to, an avoidable re-run) — never by dropping review or verification coverage. User-gate idle time is excluded per §2.1's **Interval computation** step
 
 ### 2.3 Candidate schema (one per signal)
 
 - **target skill** — one of the four bundle skills
 - **category** — `ambiguity` / `missing-branch` / `wrong-default` / `rules-conflict` / `other`. For efficiency-class findings (token-consumption / development-speed), take `wrong-default` when the inefficiency stems from a default-behavior choice, otherwise `other`
-- **description** — one-paragraph abstract description of what went wrong (sanitized per §3)
+- **description** — one-paragraph abstract description of what went wrong (sanitized per §3). When interval measurements are available (§2.1's **Interval computation** step), embed approximate values (interval seconds, output token counts) directly in this paragraph as grounding evidence — do not add a separate field
 - **suggested fix direction** — one-paragraph high-level direction, not a full patch (sanitized per §3)
 
 ### 2.4 Zero findings
@@ -129,6 +145,7 @@ Apply these rules to every candidate's `description` and `suggested fix directio
 - **Project-specific code identifiers** (types, functions, classes, domain terms) → strip, replace with structural description ("a validator function", "a message model"). Keep only the structural shape, not the names
 - **Dates, session IDs, ticket IDs, internal URLs** → strip entirely
 - **Credential-like literals** (API keys, tokens, bearer/auth header fragments, email addresses, IP addresses, hostnames beyond public domains, `.env` values) → strip entirely. When unsure, strip. This catches project-agnostic secrets that the identifier rules above would miss
+- **Absolute timestamps** → convert to relative intervals (seconds between events). Never include absolute clock times (ISO 8601 timestamps, Unix epoch values) — they reveal session timing. Relative intervals and aggregate token counts are project-agnostic numerics that need no further sanitization
 - **Keep as-is**: skill names (`dev-workflow`, `ask-peer`, `extract-rules`, `rules-review`), workflow step / phase labels (e.g. "Step 3", "Plan Review"), abstract behavior descriptions, suggested fix directions expressed in skill-level vocabulary — but see § Distribution-aware fix direction (bundle skill targets) below for the bundle-skill-prose exception
 
 ### Distribution-aware fix direction (bundle skill targets)
