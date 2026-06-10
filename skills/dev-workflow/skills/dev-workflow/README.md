@@ -225,14 +225,14 @@ interactive_commits: false
 
 Non-boolean values are ignored with a warning and fall back to `true`. To opt out for one project, set `interactive_commits: false` in `.claude/dev-workflow.md`; to opt out personally, set it in `~/.claude/dev-workflow.local.md` or `.claude/dev-workflow.local.md`.
 
-When `true`, the per-commit loop also handles pre-commit hook auto-modifications via a `fold` / `defer` gate — the user chooses whether to amend the just-landed commit (`fold`) or leave the hook-edited files for a later commit-plan iteration (`defer`). The full procedure (commit-style deduction, mid-loop adjust, cancel semantics, partial-completion reporting) lives in `skills/dev-workflow/SKILL.md` § Step 10.
+When `true`, the per-commit loop also handles pre-commit hook auto-modifications via a `fold` / `defer` gate — the user chooses whether to amend the just-landed commit (`fold`) or leave the hook-edited files for a later commit-plan iteration (`defer`). The full procedure (commit-style deduction, mid-loop adjust, cancel semantics) lives in `skills/dev-workflow/references/interactive-commits.md` (the single canonical home for Step 10's procedure); the partial-completion summary tokens stay defined in `skills/dev-workflow/SKILL.md` § Step 10.
 
 #### `compact_rules`
 
 Controls whether Step 11 sub-step 3 (Char-count compaction gate) dispatches `Skill(extract-rules) --compact` and opens the compaction approval gate. The compaction mode introduced in v1.38.0 is currently **experimental**, so this setting defaults to opt-in.
 
 - `false` (default): sub-step 3 is skipped entirely. `Skill(extract-rules) --compact` is never invoked, the compaction approval gate never opens, and § Completion's compaction reminder is automatically omitted. Sub-steps 1 (`--from-conversation`) and 2 (`--update`) still run as usual
-- `true`: the workflow invokes `Skill(extract-rules) --compact` (no file arguments — extract-rules resolves the target set internally) and may enter the Step 11 compaction approval gate when over-threshold rule files are found. Per-file accept / reject / adjust / cancel disposition follows the local closed list documented in `skills/dev-workflow/SKILL.md` § Step 11
+- `true`: the workflow invokes `Skill(extract-rules) --compact` (no file arguments — extract-rules resolves the target set internally) and may enter the Step 11 compaction approval gate when over-threshold rule files are found. Per-file accept / reject / adjust / cancel disposition follows the local closed list documented in `skills/dev-workflow/references/update-rules.md` § Char-count compaction gate
 
 ```yaml
 compact_rules: true
