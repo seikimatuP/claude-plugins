@@ -2,6 +2,17 @@
 
 ## 2026-06-10
 
+### dev-workflow v1.56.1 / dev-workflow-bundle v1.58.1
+
+- fix(dev-workflow): add Step 5 derived-value claim deferral item (auto-triage #85)
+  - Category: wrong-default; body-derived numeric claims (size/step counts) were finalized early and chased through later phases — new Step 5 item 8 defers the figure to the Step 10 entry settledness gate (with an `interactive_commits: false` fallback) behind a grep-able provisional marker.
+- fix(dev-workflow): add cross-layer review handoff ledger across Step 6-9 review layers (auto-triage #85)
+  - Category: ambiguity; sequential review layers shared no state, so deferred/partially-applied structural findings were re-raised and re-applied per layer — the ledger carries dispositions into each subsequent dispatch (Step 7 background launch, Step 7.5, Step 8 payload, Step 9 review-class hooks) with a resolve-once rule.
+- fix(dev-workflow): add iteration-scope instruction to Step 3 / Step 8 review dispatch payloads (auto-triage #83)
+  - Category: other; iter 2+ reviewers re-verified the whole deliverable from scratch — the instruction scopes their primary verification to the since-prior-iteration changes with an explicit escalation path (coverage reordered, not reduced).
+- fix(dev-workflow): add task-derived-change gate before Step 9 completion hooks (auto-triage #83)
+  - Category: missing-branch; hooks.on_complete fired against unrelated pre-existing tracked diffs when all task deliverables were untracked/gitignored — the gate skips the hook list with a skip-reason line, surfaces the unrelated diff as a warning, and fails safe (run hooks on doubt).
+
 ### dev-workflow v1.56.0 / dev-workflow-bundle v1.58.0
 
 - feat(dev-workflow): fire the Step 7 code-review background launch per pass — **behavior change**: each Step 8 post-fix re-run (the full Step 7 → Step 7.5 re-entry) now also launches the background code-review dispatch that overlaps the re-run's test phase, where these re-runs previously always dispatched the reviewer sequentially at Step 8
