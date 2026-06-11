@@ -18,7 +18,7 @@ This document is the **configuration reference**. For the internal specification
 ```bash
 /dev-workflow --init                          # Project setup (detects check/test commands)
 /dev-workflow <task>                          # Normal execution (auto-decompose check)
-/dev-workflow -i N <task>                     # Override review iterations for this run
+/dev-workflow -i N <task>                     # Override review iterations (both phases) for this run
 /dev-workflow --iterations N <task>           # Same as above (long form)
 /dev-workflow --resume <state-file>           # Resume next subtask from a decomposition state file
 /dev-workflow --resume <slug>                 # Shorthand for .claude/plans/dev-workflow.<slug>.md
@@ -59,7 +59,7 @@ After detection, each check_command is executed to verify it works, and `run-tes
 
 Settings are **merged** across layers with type-aware strategy:
 
-- **Scalar keys** (`reviewer`, `review_iterations`, etc.): higher layer wins (replaces)
+- **Scalar keys** (`reviewer`, `review_iterations`, etc.): higher layer wins (replaces). When `review_iterations` is a map (`{plan, code}`), the whole map is replaced as a single value — there is no per-key cross-layer merge (an absent map key is not inherited from a lower layer; it falls to default `3`)
 - **List keys** (`check_commands`): **appended** — lower-layer items first, then higher-layer items, duplicates removed. `test_commands` is always fixed to `["Skill(run-tests)"]` and excluded from merge
 - **`hooks`**: deep-merged — each sub-key (`on_complete`) is appended and deduplicated
 
@@ -153,7 +153,7 @@ hooks:
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `reviewer` | string | `ask-peer` | Reviewer skill name |
-| `review_iterations` | int | `3` | Max iterations for Plan / Code Review |
+| `review_iterations` | int \| map | `3` | Max iterations for Plan / Code Review. Scalar applies to both phases; map `{plan, code}` sets them independently |
 | `task_decomposition` | bool | `true` | Whether Step 1.5 runs auto-decomposition in Normal sub-mode |
 | `interactive_commits` | bool | `true` | Whether Step 10 (Interactive Commits) groups working-tree changes into commits and iterates per-commit with the user |
 | `compact_rules` | bool | `false` | Whether Step 11 sub-step 3 dispatches `Skill(extract-rules) --compact` and opens the compaction approval gate (experimental, opt-in) |
@@ -180,16 +180,21 @@ If unset or set to an unsupported value, falls back to `ask-peer`. If the specif
 
 #### `review_iterations`
 
-**Maximum** iteration count for Plan Review / Code Review. Can be overridden for a single invocation with `-i N` / `--iterations N`.
+**Maximum** iteration count for Plan Review / Code Review. Two accepted forms:
 
-Automatic adjustment by task difficulty (evaluated in Step 2):
+- **Scalar** positive integer — applies the same cap to both phases (e.g. `review_iterations: 2`).
+- **Map** `{plan: N, code: M}` — sets the Plan Review cap (Step 3) and the Code Review cap (Step 8) independently (e.g. `{plan: 1, code: 3}`). Each key must be a positive integer; an absent or invalid key (missing / non-positive / wrong-type) falls back to default `3` for that phase only. Adopting the map form is an explicit opt-in; the scalar form and an absent `review_iterations` are fully backward-compatible.
+
+Can be overridden for a single invocation with `-i N` / `--iterations N`, which **overrides both phases** with the same value regardless of the config form.
+
+Automatic adjustment by task difficulty (evaluated in Step 2) — the same cap is applied **independently to each phase's count** (they can differ only under the map form):
 
 | Difficulty | Examples | Effect |
 | --- | --- | --- |
-| Trivial | Typo, one-line edit, config value change (single unambiguous solution) | `N = 0` — Step 3 (Plan Review) & Step 8 (Code Review) skipped entirely |
-| Simple | Typo fix, config tweak, obvious bug fix | `N = 1` |
-| Moderate | Multi-file changes within one module, feature following existing patterns | `N = min(2, N)` |
-| Complex | Cross-module, new patterns, API changes, significant refactoring | Keep configured value |
+| Trivial | Typo, one-line edit, config value change (single unambiguous solution) | `N_plan = N_code = 0` — Step 3 (Plan Review) & Step 8 (Code Review) skipped entirely |
+| Simple | Typo fix, config tweak, obvious bug fix | `N_plan = N_code = 1` |
+| Moderate | Multi-file changes within one module, feature following existing patterns | `N_plan = min(2, N_plan)`, `N_code = min(2, N_code)` |
+| Complex | Cross-module, new patterns, API changes, significant refactoring | Keep both configured values (`N_plan`, `N_code`) |
 
 The **Trivial** tier is classified conservatively: only a genuinely self-evident change with a single unambiguous solution qualifies. Any doubt — a multi-part edit, a non-unique fix, or uncertainty about the approach — falls to Simple or above, so internal review (Step 3 / Step 8) is retained. Even for Trivial tasks the Step 4 plan-approval gate, Step 7 / 7.5 checks, and `hooks.on_complete` still run.
 
@@ -313,7 +318,7 @@ self_retrospective:
   feedback: "~/retrospectives/dev-workflow"
 ```
 
-**Runs regardless of task difficulty**: Step 11.5 runs whenever `self_retrospective.feedback` is configured, independent of the Step 2 difficulty assessment. Difficulty gates only the review-iteration count N (Step 3 / Step 8) — it does **not** gate the self-retrospective. Even Simple/Trivial tasks produce a retrospective when `feedback` is set — when nothing notable surfaced, it is simply short.
+**Runs regardless of task difficulty**: Step 11.5 runs whenever `self_retrospective.feedback` is configured, independent of the Step 2 difficulty assessment. Difficulty gates only the review-iteration counts N_plan / N_code (Step 3 / Step 8) — it does **not** gate the self-retrospective. Even Simple/Trivial tasks produce a retrospective when `feedback` is set — when nothing notable surfaced, it is simply short.
 
 **User preview + approval is always required**. Before submission, the assembled body is shown to the user along with a destination header (mode / resolved value / settings layer source). The user can `approve`, `edit` (revise inline), or `skip`. In repo mode, an additional explicit confirmation of `<owner/repo>` is asked before the `gh api` POST runs — this is a defense against a malicious commit to the git-tracked `.claude/dev-workflow.md` silently redirecting retrospectives.
 
@@ -476,13 +481,13 @@ The workflow begins at Step 2 (Step 1 is settings load, Step 1.5 is task decompo
 | 1 | Load Settings | Load config, resolve iteration count, register workflow tasks |
 | 1.5 | Task Decomposition | (Normal sub-mode, only when `task_decomposition: true`) Decide whether to split the task into subtasks and, if approved, create a state file. (Resume sub-mode) Load the state file and pick the next subtask — the step is executed but not registered as a task entry. Skipped entirely when `task_decomposition: false` |
 | 2 | Create Plan | Create plan in Plan Mode, assess difficulty |
-| 3 | Plan Review | Internal review by reviewer (up to N iterations; skipped entirely for Trivial tasks, N=0) |
+| 3 | Plan Review | Internal review by reviewer (up to N_plan iterations; skipped entirely for Trivial tasks, N_plan=0) |
 | 4 | Finalize Plan | **User approval gate** |
 | 5 | Implement | Follow the plan |
 | 6 | Tidy | Reduce complexity via the built-in `simplify` skill (falls back to the in-house `tidy` skill when `simplify` is unavailable) |
 | 7 | Check / Test | Run check_commands + run-tests |
 | 7.5 | Rules Compliance Review | Verify `.claude/rules/` compliance via `rules-review` skill |
-| 8 | Code Review | Code review by reviewer (up to N iterations; skipped entirely for Trivial tasks, N=0) |
+| 8 | Code Review | Code review by reviewer (up to N_code iterations; skipped entirely for Trivial tasks, N_code=0) |
 | 9 | Completion Hooks | Run `hooks.on_complete` (only if configured) |
 | 10 | Interactive Commits | (Only when `interactive_commits: true`) Group working-tree changes into commits and iterate per-commit with the user. The workflow never pushes — that stays the user's responsibility |
 | 11 | Update Rules | Update rules via `extract-rules`. Sub-step 3 (Char-count compaction gate) runs only when `compact_rules: true` (experimental, opt-in) |
@@ -517,7 +522,7 @@ In Resume mode, subtask boundaries, order, and purposes were already approved in
 1. Read the `Review guide` line and Overview — including any Highlights (≤ 30 seconds).
 2. Read the guidance line at the top of the plan — Step 4 leads with one of three literal lines that tell you where to focus.
 3. If Decisions has items, engage with each one (the real work). If Decisions is empty, approve after a light skim.
-4. The rest of the plan — Design, Test plan, Risks — is in the approval modal and has already been reviewed in Step 3 by the reviewer skill; open the modal and skim only if something looks off. (Exception: for a Trivial task, N=0, Step 3 is skipped and the plan is unreviewed — read it carefully before approving.)
+4. The rest of the plan — Design, Test plan, Risks — is in the approval modal and has already been reviewed in Step 3 by the reviewer skill; open the modal and skim only if something looks off. (Exception: for a Trivial task, N_plan=0, Step 3 is skipped and the plan is unreviewed — read it carefully before approving.)
 
 ## Prerequisites
 
@@ -535,7 +540,8 @@ To get the full benefit of dev-workflow, the following skills are recommended:
 | None of the 3 settings files exist | Prompts to run `--init` and stops |
 | Settings file has malformed YAML | Warns, skips that layer, continues with remaining layers |
 | `reviewer` unset or unsupported value | Falls back to `ask-peer` |
-| `review_iterations` is not a positive integer | Uses default `3` |
+| `review_iterations` scalar is not a positive integer (or is neither scalar nor map) | Warns, uses default `3` for both phases |
+| `review_iterations` map has an absent / non-positive / wrong-type `plan` or `code` key | Warns, uses default `3` for that phase only (the valid key is kept) |
 | `task_decomposition` is not a boolean | Warns and falls back to `true` |
 | `compact_rules` is not a boolean | Warns and falls back to `false` |
 | `custom_instructions` is not a string | Warns and ignores |
