@@ -22,13 +22,15 @@ The caller passes these fields in natural language (the skill extracts them from
 
 - `Custom instructions` *(optional)* — free-form text injected into the dispatch payload as additional constraints alongside the cleanup checklist. Orchestrators that carry their own `custom_instructions` config (e.g. workflow steps that pass project-wide constraints) route that text through this field.
 
+- `Model` *(optional)* — model id (`sonnet` / `opus` / `haiku`) applied as the `model` parameter on the reviewer `Agent` dispatch in Step 3 (a). An independent optional field (not part of a fixed-arity mode gate); a caller such as `dev-workflow` passes it to run the cleanup reviewer on a specific model. Because this skill runs a **per-iteration dispatch loop**, the same value is applied to **every** iteration's reviewer dispatch. Effective **only on the Claude Code `Agent`-dispatch path**; on the reviewer-dispatch-unavailable inline fallback (Step 3 (a)) no `Agent` is spawned, so the value is moot (the executing agent's own model governs). **Validity predicate**: a value is valid only if it is exactly one of the closed set `{sonnet, opus, haiku}` (the ids the `Agent` `model` parameter accepts); an absent field or any value outside that set (including a full `claude-*` id) is invalid → no override; the reviewer `Agent` inherits the session model (backward-compatible default).
+
 The caller must **not** stage changes while this skill is running. The skill reads the working tree; staged content would mix into the diff and corrupt the verdict. (The `Base ref` mode reads committed history vs the ref, so staging interference applies only to the default working-tree mode.)
 
 ## Process
 
 ### Step 1 — Detect changed files (main thread)
 
-1. Parse `Base ref`, `Max iterations`, and `Custom instructions` from the invocation text per `§ Invocation contract`.
+1. Parse `Base ref`, `Max iterations`, `Custom instructions`, and the optional `Model` value (`sonnet` / `opus` / `haiku`) from the invocation text per `§ Invocation contract`. Hold `Model` for the Step 3 (a) reviewer dispatch; absent or outside the closed set `{sonnet, opus, haiku}` → no override (inherit). See `§ Invocation contract`'s `Model` field for the validity predicate.
 2. Compute the changed-file set based on `Base ref`:
    - **Default mode** (no `Base ref` provided):
      - `git diff --name-only` for unstaged tracked changes
@@ -62,7 +64,7 @@ For each entry in `changed_files`, in the main thread:
 
 On `i == 1`, use the snapshot from Step 2. On `i ≥ 2`, only re-`Read` the subset of `changed_files` whose path appeared in a successfully-applied `mechanical_edits` entry during iter `i - 1` (untouched files keep their iter-1 snapshot — re-reading them is wasted work and balloons main-thread context). For that same re-read subset, also re-run the per-file `git diff` so the diff payload reflects edits that landed in prior iterations; files outside the subset keep their iter-1 diff.
 
-Dispatch a fresh reviewer through the current host's reviewer-dispatch mechanism. In Claude Code, use the `Agent` tool when it is exposed and nested dispatch is not blocked. In Codex, use the exposed subagent / delegation mechanism when available. Assemble the dispatch prompt from the five sections below, each framed with a clear `--- LABEL ---` fence so the reviewer can parse each payload unambiguously:
+Dispatch a fresh reviewer through the current host's reviewer-dispatch mechanism. In Claude Code, use the `Agent` tool when it is exposed and nested dispatch is not blocked — passing the parsed `Model` value (§ Invocation contract) as the `Agent` `model` parameter only when it resolved to a valid override, and omitting it otherwise (absent **or** invalid → inherit). Apply the same `Model` decision on every iteration's dispatch. In Codex, use the exposed subagent / delegation mechanism when available. Assemble the dispatch prompt from the five sections below, each framed with a clear `--- LABEL ---` fence so the reviewer can parse each payload unambiguously:
 
 - `--- CLEANUP CHECKLIST ---`: the full content of `references/cleanup-checklist.md`
 - `--- CHANGED FILES ---`: each changed file's path, full content, and unified diff (one block per file, separated by `### <path>` sub-headings; for untracked files present "(new file — no prior contents)" before the full current contents)
