@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-13
+
+### tidy v1.3.0 / dev-workflow v1.61.0 / dev-workflow-bundle v1.63.0
+
+- feat(tidy): add an optional `Model:` argument and propagate `subagent_model` from dev-workflow Step 6's tidy fallback dispatch
+  - `tidy` gains an optional `Model:` field (`sonnet` / `opus` / `haiku`) — an independent optional argument applied as the `model` parameter on its per-iteration reviewer `Agent` dispatch (the same value on every iteration). Absent / invalid → inherit the session model (backward-compatible). Effective only on the Claude Code `Agent`-dispatch path; moot on the reviewer-dispatch-unavailable inline fallback. Ported from the `rules-review` v1.3.0 `Model:` pattern (§ Usage / §1 parse / §5 dispatch), adapted to tidy's iteration loop.
+  - `dev-workflow` adds Step 6's `tidy` fallback as a fourth `subagent_model` propagation site via a one-commit coordinated sweep of the four governed-site enumerations: the § Configuration `subagent_model` bullet's `Model:`-propagated clause, the opening `Agent` tool usage bullet's trailing parenthetical (the "two steps / three dispatch sites" count is unchanged — the `Skill(tidy)` `Model:` propagation is not a direct `Agent` spawn), Step 2's Read-sites list, and the Step 6 dispatch body.
+  - **No default behavior change**: Step 6 Tidy runs only on Moderate / Complex tasks (the difficulty-skip matrix skips it on Trivial / Simple), whose built-in `subagent_model` default is `inherit`, and the propagation reaches `tidy` only when `simplify` is unavailable and the workflow falls back. An unconfigured user sees no change — this is plumbing for users who set a model id on the `moderate` / `complex` tiers. The built-in `simplify` primary path takes no model (built-in skills expose no argument contract); the simplify→tidy resolution is unchanged.
+
 ## 2026-06-12
 
 ### dev-workflow v1.60.0 / dev-workflow-bundle v1.62.0
