@@ -51,7 +51,7 @@ Within a category, group related rules by filename prefix into families (e.g., `
 
 Grouping policy (deterministic):
 - Default: 1 group per category (one Agent per category).
-- Split a category by family only when it contains more than 3 rule files, so each sub-group stays ≤ 3 files. Never split a family across groups.
+- Split a category by family only when it contains more than 3 **matched** rule files (rules with ≥ 1 matching changed file per Step 3 (Match Rules to Changed Files); rules that matched nothing are already discarded per the "Discard empty groups" bullet below and do not count toward this threshold), so each sub-group stays ≤ 3 files. Never split a family across groups.
 - Never merge across categories, even if each category has only 1 rule file.
 - Discard empty groups.
 
