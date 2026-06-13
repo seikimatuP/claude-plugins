@@ -14,7 +14,7 @@ This project is a Claude Code plugins marketplace. "Tests" here means verifying 
    - If `$ARGUMENTS` contains `--base-commit <sha>`: run `git diff --name-only <sha>` to get changed files (includes committed, staged, and unstaged changes)
    - Otherwise: run `git diff --name-only HEAD` to detect changed files (if HEAD is unavailable or no changed files detected, run full verification)
    - This marketplace is small and structural; any change touching `.claude-plugin/marketplace.json`, `plugins/**`, `skills/**`, or `.claude-plugin/plugin.json` should trigger full verification. If only unrelated files (e.g. `README.md`, `CHANGELOG.md`, `docs/**`) changed, still run full verification — it is fast
-2. Spawn a subagent (Agent tool, subagent_type: `general-purpose`) to execute verification
+2. Spawn a subagent (Agent tool, subagent_type: `general-purpose`, `model: sonnet`) to execute verification — pass `sonnet` as the `Agent` tool's `model` parameter. The structural checks (jq / readlink / frontmatter validation) are mechanical, so `sonnet` is sufficient by default; this is a deliberate skill-side cost choice.
 3. Return the subagent's structured summary to the caller
 
 ## Subagent Instructions
