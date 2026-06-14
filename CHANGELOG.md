@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-14
+
+### dev-workflow v1.65.0 / dev-workflow-bundle v1.67.0
+
+- feat(dev-workflow): add **Step 11.6 Workability Retrospective**, a third retrospective axis that detects this session's project-tooling improvements and offers a per-candidate disposition gate
+  - **Default: disabled** — set `workability_retrospective.enabled: true` in `.claude/dev-workflow.md` to opt in per project. The detection + 4-way disposition feature is **experimental**, following the `compact_rules` / `self_retrospective` opt-in precedent; an unconfigured user sees no behavior change.
+  - A subagent scans the session jsonl (same architecture as Step 11.5 §2.1) for **skill-candidate** signals (reusable multi-step manual procedures that could become a `.claude/skills/<name>/` skill) and **lint-rule-candidate** signals (mechanically-enforceable conventions that could be added to an existing linter config or to `check_commands`). The prose-rule axis stays delegated to Step 11 `extract-rules` (this step never writes `.claude/rules/`); the bundle-skill axis stays with Step 11.5 self-retrospective.
+  - Each candidate gets a 4-way disposition gate (a new explicit user-gate in `§ No-Stall Principle`): **act now** (start a fresh `/dev-workflow <candidate>` run, keeping commit boundaries clean), **make a subtask** (add to a decomposition state file — created fresh on a normal run — for later `--resume`), **save to backlog** (append to a markdown file under `workability_retrospective.backlog_dir`, default `.claude/improvements`), or **reject**. Runs regardless of the Step 2 difficulty assessment (mirrors Step 11.5).
+  - The procedure lives in `references/workability-retrospective.md`; `references/plan-format.md` § User-gate summary preamble gains the new gate; and the SKILL.md Agent-dispatch count moves from "two steps / three dispatch sites" to "three steps / four dispatch sites".
+
 ## 2026-06-13
 
 ### dev-workflow v1.64.0 / dev-workflow-bundle v1.66.0
