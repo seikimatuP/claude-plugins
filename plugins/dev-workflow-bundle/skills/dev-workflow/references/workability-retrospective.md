@@ -56,7 +56,7 @@ Instruct the subagent to:
    **Type:** <skill-candidate | lint-rule-candidate>
    **Title:** <short headline>
    **Evidence:** <one-paragraph sanitized, abstract description of the in-session signal>
-   **Proposed action:** <skill-candidate: proposed skill name / purpose / outline of the procedure; lint-rule-candidate: target linter (or check_commands) + the rule + the direction of the config diff>
+   **Proposed action:** <skill-candidate: proposed skill name / purpose / outline of the procedure / a draft `description` that leads with the skill's action and includes explicit `Use when ...` trigger conditions (the signal Claude Code uses to auto-invoke the skill); lint-rule-candidate: target linter (or check_commands) + the rule + the direction of the config diff>
    **Enforceability:** <linter-config | check_commands | prose-rule>
 
    ### Candidate 2
@@ -101,7 +101,7 @@ A **signal** is an underlying convention or procedure, not a single occurrence �
 - **type** — `skill-candidate` | `lint-rule-candidate`.
 - **title** — short headline.
 - **evidence** — one-paragraph abstract, sanitized (§3) description of the in-session signal.
-- **proposed action** — for `skill-candidate`: a proposed skill name, its purpose, and an outline of the procedure to extract. For `lint-rule-candidate`: the target linter (or `check_commands`) and the direction of the concrete config diff.
+- **proposed action** — for `skill-candidate`: a proposed skill name, its purpose, an outline of the procedure to extract, and a draft `description` that leads with the skill's action and includes explicit `Use when ...` trigger conditions (the signal Claude Code uses to auto-invoke the skill). For `lint-rule-candidate`: the target linter (or `check_commands`) and the direction of the concrete config diff.
 - **enforceability** (`lint-rule-candidate` only) — `linter-config` (e.g. `rubocop.yml`) / `check_commands` / `prose-rule` (→ delegate to `extract-rules`). For `skill-candidate`, `n/a`.
 
 ### 2.4 Zero candidates
