@@ -66,13 +66,15 @@ Look for user preferences and classify them:
 
 ## Step C5: Append Principles and Patterns
 
+**Execution responsibility**: items 4–6 below are write operations this subagent must perform directly — append to rule files, create staging files, delete staging entries, and create/update `.examples.md` files. Do **not** return a list of proposed changes or analysis for the caller to apply; returning recommendations without materializing the writes is a contract violation. The caller (Step C2 dispatch) expects the writes to be complete before this subagent returns the summary in item 8.
+
 1. **Read existing rule files**: read the rule files to understand current rules. The dedup logic operates over two separately-tagged file-sets: `canonical_files` (rule files under `output_dir` plus `.examples.md` files under `examples_output_dir` — the existing dedup target) and `staging_files` (the project-level staging file under `staging_output_dir` — for the staging-match branch added in the "Check for duplicates and route per category" step below). In Conversation mode these are passed via the Step C2 subagent prompt boundary; in PR Review mode and Update Mode (both defer to this Step C5 for the staging-match criterion) the main agent reads both file-sets directly with no prompt boundary — the tagging is conceptual in those cases.
 
 2. Categorize each extracted item (rule files written under `output_dir`):
    - Language-specific → `<output_dir>/languages/<lang>.md`
    - Framework-specific → `<output_dir>/frameworks/<framework>.md`
    - Integration-specific → `<output_dir>/integrations/<framework>-<integration>.md`
-   - Project-level → `<output_dir>/project.md`
+   - Project-level → `<output_dir>/project.md` (but a conversation-extracted 1st-observation project-specific pattern stages first — see item 3 branch (iii); it reaches `project.md` only on promote)
 
    **By default** (`split_output: true`): Conversation-extracted **project-specific patterns** always go to `.local.md` files. Principles may be added to shared files. `project.md` is always a single file — project-level items go there regardless of `split_output`. Promoting patterns to shared files should be done manually or via organization-level merge.
 
