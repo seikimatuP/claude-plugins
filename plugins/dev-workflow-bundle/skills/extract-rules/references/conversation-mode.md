@@ -66,6 +66,8 @@ Look for user preferences and classify them:
 
 ## Step C5: Append Principles and Patterns
 
+**Execution responsibility**: items 4–6 below are write operations this subagent must perform directly — append to rule files, create staging files, delete staging entries, and create/update `.examples.md` files. Do **not** return a list of proposed changes or analysis for the caller to apply; returning recommendations without materializing the writes is a contract violation. The caller (Step C2 dispatch) expects the writes to be complete before this subagent returns the summary in item 8.
+
 1. **Read existing rule files**: read the rule files to understand current rules. The dedup logic operates over two separately-tagged file-sets: `canonical_files` (rule files under `output_dir` plus `.examples.md` files under `examples_output_dir` — the existing dedup target) and `staging_files` (the project-level staging file under `staging_output_dir` — for the staging-match branch added in the "Check for duplicates and route per category" step below). In Conversation mode these are passed via the Step C2 subagent prompt boundary; in PR Review mode and Update Mode (both defer to this Step C5 for the staging-match criterion) the main agent reads both file-sets directly with no prompt boundary — the tagging is conceptual in those cases.
 
 2. Categorize each extracted item (rule files written under `output_dir`):
