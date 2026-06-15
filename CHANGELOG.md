@@ -2,6 +2,24 @@
 
 ## 2026-06-15
 
+### dev-workflow v1.69.1 / dev-workflow-bundle v1.70.3
+
+- fix(dev-workflow): add new guidance bullets to Step 7 sub-step 2 and Step 8 sub-step 3, plus a new simplicity-self-audit checklist item (auto-triage #101, #100)
+  - **Step 8 sub-step 3** gains **Comment-verbosity self-check** (post-fix): scan all inline code comments visible in the diff — both newly-added (`+` lines) and pre-existing context lines — for over-explanation; remove what-comments and keep only why-comments. Category: `missing-branch`
+  - **Step 7 sub-step 2** gains **Cheap-diagnostic first pass**: read raw error output before taking any edit action to identify failure class and error source — no retry budget consumed, no file edits — avoiding misdirected first-fix attempts. Category: `missing-branch`
+  - **Step 7 sub-step 2** gains **Self-contamination discrimination**: when tests pass on one Step 7 entry but fail after a workflow-applied fix (tidy/rules-review/code-review), check whether the workflow's own changes caused the regression before applying new implementation edits. Category: `missing-branch`
+  - **`references/simplicity-self-audit.md`** gains **Structural-pattern class enumeration before scope finalization**: enumerate the full class of instances of a recurring structural pattern before finalizing plan scope; record the closed list in Decisions. Category: `missing-branch`
+
+### peer v2.4.1 / dev-workflow-bundle v1.70.2
+
+- fix(ask-peer): add negative-existence-claim verification to Planning review focus areas (auto-triage #101)
+  - New sub-bullet instructs the reviewer to treat claims like "X is the only way" or "no alternative exists" as hypotheses and verify them against primary sources before confirming or echoing them in feedback. Category: `missing-branch`
+
+### extract-rules v1.20.2 / dev-workflow-bundle v1.70.1
+
+- fix(extract-rules): add execution-responsibility statement to Step C5 (auto-triage #102)
+  - New "Execution responsibility" preamble paragraph in Step C5 explicitly states that write operations (rule-file appends, staging-file creates/deletes, `.examples.md` updates) are performed directly by the subagent — returning a list of proposed changes without materializing the writes is a contract violation. Category: `missing-branch`
+
 ### rules-review v1.4.0 / dev-workflow-bundle v1.70.0
 
 - feat(rules-review): add a trailing single fenced JSON return contract so orchestrators can mechanically parse the rules-compliance verdict — additive and backward-compatible
