@@ -157,7 +157,7 @@ hooks:
 | `task_decomposition` | bool | `true` | Whether Step 1.5 runs auto-decomposition in Normal sub-mode |
 | `interactive_commits` | bool | `true` | Whether Step 10 (Interactive Commits) groups working-tree changes into commits and iterates per-commit with the user |
 | `compact_rules` | bool | `false` | Whether Step 11 sub-step 3 dispatches `Skill(extract-rules) --compact` and opens the compaction approval gate (experimental, opt-in) |
-| `visual_plan_review` | bool | `false` | Whether Step 4 launches the browser-based structured review gate (summary header, collapsible sections, Decision cards with a recommend/alternative toggle, per-element comments, mermaid diagrams) in place of the text approval (local CLI / Remote Control only — falls back to text on Claude Code on the Web; experimental, opt-in) |
+| `visual_plan_review` | bool | `false` | Whether Step 4 launches the browser-based structured review gate (summary header, collapsible sections, Decision cards with a recommend/alternative toggle, per-element comments, mermaid diagrams) in place of the text approval (local CLI / Remote Control only — on Claude Code on the Web the browser gate never launches, so Step 4 uses a no-Plan-Mode chat approval; enabling it also takes Step 2 out of Plan Mode; experimental, opt-in) |
 | `custom_instructions` | string | (none) | Free-form instructions applied across all phases |
 | `check_commands` | list&lt;string&gt; | (none) | Static checks (lint / format / typecheck, etc.) |
 | `test_commands` | list&lt;string&gt; | `["Skill(run-tests)"]` | Test execution (fixed) |
@@ -271,7 +271,9 @@ Behavior:
 - `false` (default): Step 4 always uses the text path — the chat-rendered condensed plan followed by `ExitPlanMode` — exactly as before
 - `true`: Step 4 launches the gate **only when the local browser is reachable** (the agent and the user share a machine — local CLI / Remote Control). The gate serves the plan on a local `127.0.0.1` server (the bundled `scripts/plan-review/serve.mjs` viewer), opens your browser, and lets you review and comment per element, then choose **approve** or **revise**. `approve` proceeds to implementation; `revise` applies your comments (and any recommendation/alternative switches) to the plan and re-runs the gate
 
-Reachability is detected via `CLAUDE_CODE_REMOTE`: when it is `"true"` (the cloud-execution marker set by Claude Code on the Web), the agent runs in a remote headless sandbox whose `127.0.0.1` and `open` cannot reach your browser, so Step 4 transparently falls back to the text path. The gate also falls back on any launch failure (non-zero `serve.mjs` exit, blocked Bash call).
+Reachability is detected via `CLAUDE_CODE_REMOTE`: when it is `"true"` (the cloud-execution marker set by Claude Code on the Web), the agent runs in a remote headless sandbox whose `127.0.0.1` and `open` cannot reach your browser, so Step 4 transparently falls back to a chat approval. The gate also falls back on any launch failure (non-zero `serve.mjs` exit, blocked Bash call).
+
+**Plan Mode interaction**: the gate's browser launch and served-file write are non-read-only operations that Plan Mode forbids, so enabling `visual_plan_review: true` makes **Step 2 skip Plan Mode entirely** (the gate can only fire outside it). On this path the canonical plan document is `.claude/plans/<slug>.md` and approval comes from the browser submit — or, when the browser is unreachable, a chat reply — rather than the `ExitPlanMode` modal. The default (`false`) keeps the unchanged `EnterPlanMode → ExitPlanMode` Plan Mode flow.
 
 ```yaml
 visual_plan_review: true
@@ -279,7 +281,7 @@ visual_plan_review: true
 
 Non-boolean values are ignored with a warning and fall back to `false`. To opt in for one project, set `visual_plan_review: true` in `.claude/dev-workflow.md`; to opt in personally, set it in `~/.claude/dev-workflow.local.md` or `.claude/dev-workflow.local.md`.
 
-Note: this is a **local-only** feature. On Claude Code on the Web it always falls back to text — the web UI offers no rich review surface beyond chat — so enabling it there is harmless but has no effect.
+Note: the **rich visual gate** is a local-only feature. On Claude Code on the Web the browser gate never launches — the web UI offers no rich review surface beyond chat — so it always uses the chat-approval fallback. Enabling it there is not a no-op, though: it still takes Step 4 out of Plan Mode, so the approval surface becomes the chat reply rather than the `ExitPlanMode` modal.
 
 #### `custom_instructions`
 
@@ -534,9 +536,9 @@ The workflow begins at Step 2 (Step 1 is settings load, Step 1.5 is task decompo
 | --- | --- | --- |
 | 1 | Load Settings | Load config, resolve iteration count, register workflow tasks |
 | 1.5 | Task Decomposition | (Normal sub-mode, only when `task_decomposition: true`) Decide whether to split the task into subtasks and, if approved, create a state file. (Resume sub-mode) Load the state file and pick the next subtask — the step is executed but not registered as a task entry. Skipped entirely when `task_decomposition: false` |
-| 2 | Create Plan | Create plan in Plan Mode, assess difficulty |
+| 2 | Create Plan | Create plan (in Plan Mode unless `visual_plan_review: true`, which skips Plan Mode so the Step 4 gate can fire), assess difficulty |
 | 3 | Plan Review | Internal review by reviewer (up to N_plan iterations; skipped entirely for Trivial tasks, N_plan=0) |
-| 4 | Finalize Plan | **User approval gate** (text approval by default; a browser-based structured review gate — summary header, collapsible sections, Decision cards with a recommend/alternative toggle, per-element comments — when `visual_plan_review: true` and the local browser is reachable, falling back to text otherwise) |
+| 4 | Finalize Plan | **User approval gate** (text approval with `ExitPlanMode` by default; when `visual_plan_review: true`, Step 2 skips Plan Mode and Step 4 uses a browser-based structured review gate — summary header, collapsible sections, Decision cards with a recommend/alternative toggle, per-element comments — when the local browser is reachable, falling back to a no-Plan-Mode chat approval otherwise) |
 | 5 | Implement | Follow the plan |
 | 6 | Tidy | Reduce complexity via the built-in `simplify` skill (falls back to the in-house `tidy` skill when `simplify` is unavailable); skipped for Trivial / Simple tasks per the difficulty-skip matrix |
 | 7 | Check / Test | Run check_commands + run-tests |

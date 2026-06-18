@@ -136,7 +136,7 @@ This is the explicit user-gate enumerated in SKILL.md `§ No-Stall Principle`.
 
 ## 5. Backlog file format
 
-- **Location**: `<backlog_dir>/<YYYY-MM-DD>-<slug>.md`, where `<slug>` is the run's plan slug (Step 1) or a kebab slug derived from the candidate when no plan slug exists. On same-day, same-slug collision, append `-2`, `-3`, … until unused.
+- **Location**: `<backlog_dir>/<YYYY-MM-DD>-<slug>.md`, where `<slug>` is the run's plan slug or a kebab slug derived from the candidate when no plan slug exists. On same-day, same-slug collision, append `-2`, `-3`, … until unused.
 - **Per candidate, one section** with headed fields:
 
   ```markdown

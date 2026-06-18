@@ -7,7 +7,7 @@ Deep reference for Step 1.5. Read this when either:
 
 If neither applies, you can skip this file — Step 1.5 has no work to do.
 
-`EnterPlanMode` is reserved for Step 2. Any proposal in this step is a plain yes/no dialogue, not a plan.
+`EnterPlanMode` is reserved for Step 2 (and only when `visual_plan_review: false`; on the `visual_plan_review: true` path Step 2 skips Plan Mode — see `SKILL.md` § Configuration). Any proposal in this step is a plain yes/no dialogue, not a plan.
 
 ## State file schema
 
