@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>プランレビュー — dev-workflow</title>
+  <title>Plan Review — dev-workflow</title>
 
   <!-- highlight.js theme (cdnjs, pinned + SRI) -->
   <link rel="stylesheet"
@@ -178,23 +178,23 @@
 <body>
   <div id="app">
     <header class="plan-head">
-      <h1>プランレビュー</h1>
-      <div class="meta">プラン: <span id="plan-id">…</span> ／ 各ブロックにコメントを付け、下部で「承認」か「修正を依頼」を選んで送信してください。</div>
+      <h1>Plan Review</h1>
+      <div class="meta">Plan: <span id="plan-id">…</span> — comment on any block, then choose "Approve" or "Request changes" below and submit.</div>
     </header>
-    <nav id="toc"><div class="toc-title">セクション</div></nav>
+    <nav id="toc"><div class="toc-title">Sections</div></nav>
     <main id="plan"></main>
-    <div id="done" hidden>送信しました。ターミナルに戻ってください。</div>
+    <div id="done" hidden>Submitted. Return to your terminal.</div>
   </div>
 
   <div id="bar">
     <div class="decision">
-      <label class="choice approve"><input type="radio" name="decision" value="approve"> 承認</label>
-      <label class="choice revise"><input type="radio" name="decision" value="revise"> 修正を依頼</label>
+      <label class="choice approve"><input type="radio" name="decision" value="approve"> Approve</label>
+      <label class="choice revise"><input type="radio" name="decision" value="revise"> Request changes</label>
     </div>
-    <span class="count">コメント <span id="comment-count">0</span> 件</span>
+    <span class="count">Comments: <span id="comment-count">0</span></span>
     <span class="spacer"></span>
     <span id="status"></span>
-    <button id="send-btn" type="button" disabled>Claude に送信</button>
+    <button id="send-btn" type="button" disabled>Send to Claude</button>
   </div>
 
   <script type="module">
@@ -232,10 +232,10 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "comment-btn";
-      btn.textContent = "このブロックにコメント";
+      btn.textContent = "Comment on this block";
       const area = document.createElement("textarea");
       area.className = "comment-input";
-      area.placeholder = "このブロックへのコメント…";
+      area.placeholder = "Comment on this block…";
       area.hidden = true;
       area.addEventListener("input", () => {
         const v = area.value.trim();
@@ -332,12 +332,12 @@
         document.getElementById("done").scrollIntoView({ behavior: "smooth" });
       } catch (err) {
         sendBtn.disabled = false;
-        status.textContent = `送信に失敗しました: ${err.message}`;
+        status.textContent = `Failed to send: ${err.message}`;
       }
     }
 
     init().catch((err) => {
-      document.getElementById("status").textContent = `読み込みに失敗しました: ${err.message}`;
+      document.getElementById("status").textContent = `Failed to load: ${err.message}`;
       console.error(err);
     });
   </script>
