@@ -15,4 +15,5 @@ hooks:
 self_retrospective:
   feedback: "SonicGarden/dev-workflow-issues"
 compact_rules: false
+visual_plan_review: true
 ---
