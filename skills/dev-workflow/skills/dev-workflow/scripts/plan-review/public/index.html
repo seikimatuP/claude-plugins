@@ -72,6 +72,15 @@
     .chip b { color: var(--muted); font-weight: 600; }
     .chip.risk { background: #fff4ec; border-color: #f0c0a0; color: var(--risk); }
     .chip.risk b { color: var(--risk); }
+    /* Scope is descriptive prose, not an enum — give it a labeled meta row that wraps,
+       instead of cramming it into a fixed-shape pill like Difficulty / Risks */
+    #plan-scope { margin-top: 8px; }
+    .meta-scope { display: flex; gap: 8px; align-items: baseline; font-size: 12px; line-height: 1.5; }
+    .meta-scope .meta-label {
+      flex: none; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--muted); padding-top: 2px;
+    }
+    .meta-scope .meta-val { color: var(--fg); min-width: 0; }
     /* section nav */
     #toc {
       position: sticky; top: 16px; align-self: start;
@@ -99,6 +108,10 @@
       content: "▸"; color: var(--muted); font-size: 12px; transition: transform .12s;
     }
     details.section[open] > summary::before { transform: rotate(90deg); }
+    /* Context = the "why" framing; tint it so it reads as lead context, not a structural section */
+    details.section.is-context { background: var(--bg-soft); border-color: #c9d3dd; }
+    details.section.is-context > summary .sec-title { color: var(--muted); }
+    details.section.is-context .sec-body { color: #2b333b; }
     .sec-title { font-size: 15px; }
     .badge {
       font-size: 11px; font-weight: 700; border-radius: 999px;
@@ -149,7 +162,11 @@
     .dc-toggle label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--muted); }
     .dc-toggle label:has(input:checked) { color: var(--fg); font-weight: 600; }
     /* comment affordances */
-    .commentable { position: relative; }
+    /* Highlight the block under the cursor so the comment target's extent is obvious — the
+       per-element comment model treats each paragraph / list item as its own target. The tint
+       is a step deeper than --bg-soft so it stays visible inside the tinted Context section too. */
+    .commentable { position: relative; border-radius: 6px; transition: background .12s; }
+    .commentable:hover { background: #e8edf3; }
     .cbtn {
       position: absolute; top: 0; right: -2px; opacity: 0;
       font-size: 12px; line-height: 1; border: 1px solid var(--border);
@@ -200,6 +217,7 @@
       <div class="eyebrow">Plan Review — <span id="plan-id">…</span></div>
       <h1 id="plan-title">…</h1>
       <div id="plan-chips"></div>
+      <div id="plan-scope" class="meta-scope" hidden></div>
     </header>
     <nav id="toc"><div class="toc-title">Sections</div></nav>
     <main id="plan"></main>
@@ -397,9 +415,15 @@
       document.getElementById("plan-title").innerHTML = ov.goal ? mdInline(ov.goal) : escapeHtml(planId);
       const chips = [];
       if (ov.difficulty) chips.push(chip("Difficulty", stripMd(ov.difficulty)));
-      if (ov.scope) chips.push(chip("Scope", stripMd(ov.scope)));
       if (riskCount) chips.push(chip("Risks", String(riskCount), "risk"));
       document.getElementById("plan-chips").innerHTML = chips.join("");
+      // Scope is descriptive (often a file list), so render it as a labeled meta row that wraps
+      // rather than a fixed-shape pill alongside the short enum chips above.
+      const scopeEl = document.getElementById("plan-scope");
+      if (ov.scope) {
+        scopeEl.innerHTML = `<span class="meta-label">Scope</span><span class="meta-val">${escapeHtml(stripMd(ov.scope))}</span>`;
+        scopeEl.hidden = false;
+      }
     }
 
     function renderNav(sections) {
@@ -538,7 +562,7 @@
 
     function renderSection(section) {
       const det = document.createElement("details");
-      det.className = "section";
+      det.className = "section" + (section.type === "context" ? " is-context" : "");
       det.id = `sec-${section.id}`;
       if (OPEN_TYPES.has(section.type)) det.open = true;
 
