@@ -175,7 +175,7 @@ Files this workflow itself creates and maintains as in-session state — plan do
    - Key absent from the file: left untouched (inherit from lower layers)
    If a file's YAML frontmatter is malformed (parse error), warn the user naming the file, skip that layer, and continue with remaining layers.
 2. If none of the three files exist, prompt user to run `/dev-workflow --init` and stop
-3. Resolve `reviewer` from config. If not specified or not in the supported list (ask-peer, ask-claude, ask-codex, ask-gemini, ask-copilot, ask-agy), use `ask-peer`. **Reviewer-family classification** (the single definition referenced by the Step 3 / Step 8 inline-reviewer `subagent_model` propagation): **Claude-family** = `ask-peer` / `ask-claude` — model-controllable (`ask-peer` via its `Model:` argument applied to its internal `Agent` dispatch; `ask-claude` via the `claude -p --model` flag); **external-CLI** = `ask-codex` / `ask-gemini` / `ask-copilot` / `ask-agy` — these run their own non-Claude models and are **not** `subagent_model`-controllable (never receive a propagated model)
+3. Resolve `reviewer` from config. If not specified or not in the supported list (ask-peer, ask-claude, ask-codex, ask-gemini, ask-copilot, ask-agy), use `ask-peer`. **Reviewer-family classification** (the single definition referenced by the Step 3 / Step 8 inline-reviewer `subagent_model` propagation): **Claude-family** = `ask-peer` / `ask-claude` — model-controllable (`ask-peer` via its `Model:` argument applied to its internal `Agent` dispatch; `ask-claude` via the `claude -p --model` flag); **external-CLI** = `ask-codex` / `ask-gemini` / `ask-copilot` / `ask-agy` — these run their own non-Claude models and are **not** `subagent_model`-controllable (never receive a propagated model). If the resolved `reviewer` is not `ask-peer` (bundle member, always available when dev-workflow is installed), probe availability immediately: attempt `Skill(<reviewer>)` with a one-word probe request (e.g., `ping`); if the call fails, retry once. If still failing, emit the three-option prompt defined in § Prerequisites' "Reviewer skill" bullet — do not block the run, present the options and let the user decide before the first review step begins.
 4. Resolve the review iteration counts — **N_plan** (Plan Review, Step 3) and **N_code** (Code Review, Step 8). A scalar config, the `-i` option, and the default all set both values equally; only the map config form makes them differ:
    1. If `-i` / `--iterations` option is present and is a positive integer, set both N_plan and N_code to it (the option overrides both phases)
    2. Else if config `review_iterations` is present:
@@ -567,6 +567,13 @@ The reminder is omitted when `difficulty_skipped_steps` is empty (Moderate / Com
 - `language: en`: `<N> uncommitted change(s) under \`.claude/rules/\` remain — please commit manually before opening a PR`
 
 The reminder is omitted when `uncommitted_rule_changes` is empty — including the case where Step 11's "Commit rule updates" gate already committed the rule changes (`interactive_commits: true`, gate accepted). When `interactive_commits: false` the gate never ran, so the rule changes stay uncommitted and the reminder fires as before (backward-compatible).
+
+**Step 11 staging-dir reminder**: immediately after the rule-update reminder, compute `uncommitted_staging_changes` — the set of paths under the `extract-rules` staging directory still uncommitted at Completion. The staging directory is the `staging_output_dir` setting from `.claude/extract-rules.local.md` (read that file's frontmatter `staging_output_dir` field if the field is set; otherwise use the default `.claude/rules-staging/`). Run `git status --porcelain=v1 --untracked-files=all -z` and filter to paths under the resolved staging directory. When `uncommitted_staging_changes` is non-empty, surface a reminder in the resolved `language` (`<N>` = number of uncommitted staging files, `<staging_dir>` = the resolved directory):
+
+- `language: ja`: `\`<staging_dir>\` に未レビューの extract-rules 候補が <N> 件あります — 手動で確認し、採用するものを \`.claude/rules/\` へ promote してください`
+- `language: en`: `<N> extract-rules candidate(s) under \`<staging_dir>\` await review — inspect and promote accepted files to \`.claude/rules/\` manually`
+
+The reminder is omitted when `uncommitted_staging_changes` is empty.
 
 **Step 11 compaction reminder** (per [`references/plan-format.md`](references/plan-format.md) § Localization granularity): this block has two independent clauses.
 

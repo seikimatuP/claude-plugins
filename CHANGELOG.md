@@ -2,6 +2,16 @@
 
 ## 2026-06-19
 
+### dev-workflow v1.74.2 / extract-rules v1.20.4 / dev-workflow-bundle v1.75.2
+
+- fix(dev-workflow): missing-branch fixes across Step 2, Step 9, and Step 10 interactive-commits procedures (auto-triage 2026-06-19)
+  - Category: missing-branch (issues #117–#121)
+  - **Step 2 self-check** (issues #118–#120): added early reviewer availability probe; added numerical-constant origin disambiguation; added permission and capability assumption verification; added codebase impact cross-check; added behavior semantics verification to plan review category (c)
+  - **Step 10 interactive-commits** (issue #117): diff rendering extended from 2-mode to 3-mode (verbatim / condensed / skeleton) for large diffs; Mid-loop adjust branch g added (actual-code edits made during per-commit accept gate, with explicit (1) continue / (2) stop-for-re-verification choices)
+  - canonical `SKILL.md` / `references/` and the `dev-workflow-bundle` copy synced byte-identical
+- fix(extract-rules): staging_output_dir config description now includes downstream automation note (auto-triage 2026-06-19)
+  - Category: missing-branch (issue #121)
+
 ### dev-workflow v1.74.1 / dev-workflow-bundle v1.75.1
 
 - fix(dev-workflow): the Step 11 "Commit rule updates" gate now frames its user-facing output in the resolved `language` (was English-only)
