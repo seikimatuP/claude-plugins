@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-19
+
+### dev-workflow v1.73.0 / dev-workflow-bundle v1.74.0
+
+- feat(dev-workflow): the **visual plan-review gate** now shows a **diff on revise re-launch** so the user can focus on what changed instead of re-reading the whole plan
+  - **`scripts/plan-review/serve.mjs`**: new optional `--prev <path>` arg; when supplied and readable, `/api/plan` ships its content as `prevMarkdown` (else `null`). An unreadable `--prev` is non-fatal (warning + no diff). `--lang` now also localizes the diff banner.
+  - **`scripts/plan-review/public/index.html`**: when `prevMarkdown` is present, the viewer diffs current-vs-prev section by section — changed / new sections get a `Changed` / `New` badge and auto-open, unchanged sections collapse, and changed blocks (paragraphs / list items / Decision cards) are highlighted; a localized banner reports the changed-section count. First launch (no `prevMarkdown`) renders exactly as before. Diffing reuses `parseSections` plus a read-only `collectBlockTexts` helper (no DOM mutation); the commentable block-tag set is shared with `attachElementComments` via a new `COMMENT_BLOCK_TAGS` constant.
+  - **`references/visual-plan-review.md`**: new § Prev snapshot documents the `.plan-review.prev.md` snapshot discipline (closed list of two sites — before the localized-revise `Edit`, and before the served-file `Write` on non-first launches), the `--prev` launch wiring, and the `{ id, markdown, lang, prevMarkdown }` `/api/plan` contract.
+  - **`SKILL.md`**: `.plan-review.prev.md` added to § Workflow artifacts (cross-step fixed exclusion) and § Completion's cleanup `rm -f`. **`README.md`**: the `visual_plan_review` docs note the revise diff.
+  - **Investigation note (no code change)**: the Decision-card Recommendation/Alternative toggle was already present (added in the v1.71.0 visual-gate overhaul) and renders whenever a Decision carries an `**Alternative**` line — confirmed working as intended, so the "selection UI not shown" feedback needed no code change.
+  - **Verification**: this run verified `serve.mjs --prev` over `/api/plan` (curl) and the browser diff rendering (badges / auto-open / collapse / block highlight / prev-absent fallback) via Playwright; the end-to-end revise→re-launch diff activates only in a session that re-launches the viewer, so it is confirmed in a fresh local session with `visual_plan_review: true`.
+
 ## 2026-06-18
 
 ### dev-workflow v1.72.1 / dev-workflow-bundle v1.73.1
