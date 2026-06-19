@@ -824,7 +824,8 @@
         return;
       }
       // Decision shortcuts: bare a/r, only outside text-entry fields and unmodified.
-      const tag = document.activeElement ? document.activeElement.tagName : "";
+      const active = document.activeElement;
+      const tag = active ? active.tagName : "";
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       if (e.key === "a") { e.preventDefault(); selectDecision("approve"); }
