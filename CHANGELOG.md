@@ -2,6 +2,13 @@
 
 ## 2026-06-19
 
+### dev-workflow v1.74.1 / dev-workflow-bundle v1.75.1
+
+- fix(dev-workflow): the Step 11 "Commit rule updates" gate now frames its user-facing output in the resolved `language` (was English-only)
+  - **Bug**: the rule-update commit gate added in v1.74.0 reuses the Step 10 interactive-commits presentation mechanics, but the § Configuration `language` bullet's localized-surface list named only the *Step 10* commit gate output — so the Step 11 gate's commit presentation and accept / adjust / cancel prompt rendered in English regardless of the resolved `language`, unlike every other user-facing step.
+  - **Fix**: added the Step 11 "Commit rule updates" gate to the `language` bullet's localized-surface list (subjects / body / diff framed in the resolved language; verbatim `git` output and file paths stay English — same contract as the Step 10 commit gates), and added an explicit cross-reference in the Step 11 sub-step so the framing language is stated at the point of use.
+  - canonical `SKILL.md` and the `dev-workflow-bundle` copy synced byte-identical.
+
 ### dev-workflow v1.74.0 / dev-workflow-bundle v1.75.0
 
 - feat(dev-workflow): Step 11 (Update Rules) now **proposes committing** the `.claude/rules/` changes that `extract-rules` writes, instead of only emitting a manual-commit reminder
