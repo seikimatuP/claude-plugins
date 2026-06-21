@@ -84,21 +84,21 @@ Concrete cases:
   - Rule file `.claude/rules/languages/typescript.md` references `./typescript.examples.md`
   - Rule file `.claude/rules/project.md` references `./project.examples.md`
 
-When `examples_output_dir` is changed and `--restructure` regenerates the rule layout, this reference section is rewritten with the new relative path so the link continues to point at the live examples file location. Modes that emit or maintain this reference section (Full Extraction Step 6, Update Step U5, Restructure Step R4, Conversation Step C5, PR Review Step P5) must use the same relative-path calculation so the format stays consistent across rebuilds.
+When `examples_output_dir` is changed and `--restructure` regenerates the rule layout, this reference section is rewritten with the new relative path so the link continues to point at the live examples file location. Modes that emit or maintain this reference section (Full Extraction Step 6, Update Step U5, Restructure Step R4, Conversation Step C5, Conversation Candidate Apply Step A2, PR Review Step P5) must use the same relative-path calculation so the format stays consistent across rebuilds.
 
-**Note**: In incremental modes (Conversation Step C5, PR Review Step P5), staging-only project-level entries (1st-observation candidates written to `<staging_output_dir>/project.staging.local.md` rather than `<output_dir>/project.md`) **skip** the `.examples.md` generation step — the 1st observation's code site is intentionally not anchored to keep `.examples.md` free of 1-shot samples. Examples are generated on promote (2nd observation lands in canonical). See `conversation-mode.md` § Step C5's **"Update `.examples.md`"** step for the canonical statement.
+**Note**: In incremental modes (Conversation Step C5, Conversation Candidate Apply Step A2, PR Review Step P5), staging-only project-level entries (1st-observation candidates written to `<staging_output_dir>/project.staging.local.md` rather than `<output_dir>/project.md`) **skip** the `.examples.md` generation step — the 1st observation's code site is intentionally not anchored to keep `.examples.md` free of 1-shot samples. Examples are generated on promote (2nd observation lands in canonical). See `conversation-mode.md` § Step C5's **"Update `.examples.md`"** step for the canonical statement.
 
 **Direction is one-way: rule file → examples file only.** `.examples.md` files themselves never carry a `## Examples` reference section — no self-reference (link to themselves), no link to a sibling `.examples.md`. When generating or updating an examples file, do not append a reference section. Templates and subagent prompts that scaffold examples files must omit this section.
 
 ## Common Generation Procedure
 
-This procedure applies to all modes (Full Extraction, Update, Restructure, Conversation, PR Review). After generation, run the Portability check (below).
+This procedure applies to all modes (Full Extraction, Update, Restructure, Conversation, Conversation Candidate Apply, PR Review). After generation, run the Portability check (below).
 
 ### For Full Extraction / Restructure
 
 Examples are generated alongside rule files. Since the codebase has already been analyzed in earlier steps, use the code patterns already collected to create examples.
 
-### For Update / Conversation / PR Review (incremental modes)
+### For Update / Conversation / Conversation Candidate Apply / PR Review (incremental modes)
 
 For each new rule added:
 
@@ -117,4 +117,4 @@ Common leaks:
 - **Test-file origin**: unit-test samples often describe the pattern in test-isolation terms. Either rewrite the description in production-contract terms with a production Good example, or add a `test-only` qualifier to the rule title
 - **Specific-site framing**: description references local variables / fixture names. Rewrite in terms of the pattern's contract
 
-Applies to all modes (Full Extraction, Update, Restructure, Conversation, PR Review).
+Applies to all modes (Full Extraction, Update, Restructure, Conversation, Conversation Candidate Apply, PR Review).

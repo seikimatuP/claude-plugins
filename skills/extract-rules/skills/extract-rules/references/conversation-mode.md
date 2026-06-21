@@ -66,11 +66,52 @@ Look for user preferences and classify them:
 
 **6. Abstraction normalization** → Normalize before any write (canonical or staging): Before writing any extracted item, normalize its phrasing to "abstract principle as main sentence, incident-specific details as parenthetical suffix." The main sentence should generalize beyond the specific session so a re-observation of the same pattern can match it (enabling staging → canonical promote). Move concrete identifiers that anchor the rule to a single incident — specific filenames, specific UI elements, one-time symptoms — from the main sentence into a parenthetical suffix (e.g., "component re-render after auth state change may lose ephemeral key state (e.g., observed in `FooBar.tsx` post-login)" rather than "`FooBar.tsx` reports missing key after login"). A rule whose main sentence is incident-specific will not be re-matched in the next session regardless of how many similar observations accumulate.
 
+## Rule-candidate contract (Step C4 output)
+
+This section defines the **serializable contract** between Step C4 (which produces rule candidates) and Step C5 (which applies them). In standalone `--from-conversation`, C4 produces these candidates in-context and the same subagent's C5 consumes them, so the contract is **conceptual** (no file boundary). In **Conversation Candidate Apply Mode** (`--apply-conversation-candidates <path>`, see main SKILL.md), the candidates arrive **serialized** in the input file and C5 runs on them directly — there the contract is the file format. The block reuses the shared session-scan's `### Candidate <N>` … `Candidates: <N>` **envelope** (the heading + trailing-count wrapper) so an orchestrator's shared conversation scan can carry it as one axis block. **Only the envelope is shared** — the field set below is specific to this rule-extraction axis and is **not** the workability axis's `### Candidate` schema (which carries a different `Type` enum and different fields). A future shared-scan rule-extraction axis would define the fields below; do not assume the existing workability axis emits this block unchanged.
+
+**Block shape**: one candidate per `### Candidate <N>` heading with labelled fields, then a trailing `Candidates: <N>` line giving the count:
+
+```text
+### Candidate 1
+- Type: pattern
+- Category: project
+- Name:
+- Signature: `clean_bracket_params(:keyword)`
+- Context: WAF-added bracket stripping
+- Rule: <normalized rule text — abstract principle as main sentence, incident-specific detail as parenthetical suffix>
+
+### Candidate 2
+- Type: principle
+- Category: language
+- Name: typescript
+- Signature:
+- Context: nullable handling
+- Rule: <normalized rule text>
+
+Candidates: 2
+```
+
+**Fields** (the minimal set Step C5's routing + staging-gating + dedup + examples need). Each field's **required-ness is conditioned on the `Type` / `Category` discriminators** — Step A1's "carries the required fields" validation (and standalone C4's in-context production) resolves against the per-field conditions below. A candidate that omits a field its discriminators mark required-non-empty is malformed; in Conversation Candidate Apply Mode this fails Step A1 validation fail-loud (do not route it best-effort):
+
+- **`Type`** — `principle` | `pattern`. Always required-non-empty. Drives the staging-gating below.
+- **`Category`** — `language` | `framework` | `integration` | `project`. Always required-non-empty. Drives Step C5 item 2's file routing (`languages/<lang>.md` / `frameworks/<framework>.md` / `integrations/<framework>-<integration>.md` / `project.md`).
+- **`Name`** — the routing file stem for `language` / `framework` / `integration` (`<lang>` / `<framework>` / `<framework>-<integration>`). Required-non-empty when `Category ∈ {language, framework, integration}` (it is the routed file's stem); empty for `Category == project`.
+- **`Signature`** — inline code signature, used for the staging-match (a) signature test (Step C5 item 3 (ii)) and as the `.examples.md` title. Required-non-empty when `Type == pattern` (a pattern's written bullet is `` `signature` - context `` per the Step 6 Project-specific-patterns format, and the signature is its dedup / staging-match / examples key); empty when `Type == principle` (a principle has no signature).
+- **`Context`** — the **brief** context phrase (2-5 words, per the Step 6 Project-specific-patterns format). Used for the staging-match (b) context test, and — for `pattern` items — it is the **trailing context written into the rule bullet** (`` `Signature` - Context ``). Required-non-empty when `Type == pattern`; optional / informational for `principle` items.
+- **`Rule`** — the normalized rule text (already abstraction-normalized per Step C4 item 6). Always required-non-empty. **Written-bullet mapping**: for `principle` items the `Rule` text **supplies** the written bullet, reshaped into the Step 6 Principles format `Principle name (hints)` (lead noun phrase as the name, 2-4 implementation keywords as hints — `Rule` may arrive as prose, so it is reshaped, not written verbatim); for `pattern` items the `Rule` is the long-form retained for the semantic-dedup comparison (Step C5 item 3 (i) canonical match) and is **not** written into the bullet — the pattern bullet is `` `Signature` - Context ``.
+
+**Staging-gating in contract terms**: the staging 3-branch (defined by Step C5 item 3's "Check for duplicates and route per category" — the source of truth) fires exactly when **`Type == pattern` AND `Category == project`**; every other combination — including a `project`-scope `principle`, which lands in `project.md`'s Principles section — bypasses staging and writes canonical directly.
+
+**Examples**: the contract carries **no** example field — Step C5 item 6 mines `.examples.md` content downstream from the codebase, keyed on the candidate's `Signature` (see `references/examples-format.md`).
+
 ## Step C5: Append Principles and Patterns
 
 **Execution responsibility**: items 4–6 below are write operations this subagent must perform directly — append to rule files, create staging files, delete staging entries, and create/update `.examples.md` files. Do **not** return a list of proposed changes or analysis for the caller to apply; returning recommendations without materializing the writes is a contract violation. The caller (Step C2 dispatch) expects the writes to be complete before this subagent returns the summary in item 8.
 
-1. **Read existing rule files**: read the rule files to understand current rules. The dedup logic operates over two separately-tagged file-sets: `canonical_files` (rule files under `output_dir` plus `.examples.md` files under `examples_output_dir` — the existing dedup target) and `staging_files` (the project-level staging file under `staging_output_dir` — for the staging-match branch added in the "Check for duplicates and route per category" step below). In Conversation mode these are passed via the Step C2 subagent prompt boundary; in PR Review mode and Update Mode (both defer to this Step C5 for the staging-match criterion) the main agent reads both file-sets directly with no prompt boundary — the tagging is conceptual in those cases.
+**Candidate source (mode-dependent)**: the items applied below are the extracted candidates conforming to § Rule-candidate contract — produced in-context by C4 in standalone Conversation mode (this subagent), or read from the input file in Conversation Candidate Apply Mode (main agent, no subagent). The routing / dedup / write / promote / examples / security steps below are identical regardless of source.
+
+1. **Read existing rule files**: read the rule files to understand current rules. The dedup logic operates over two separately-tagged file-sets: `canonical_files` (rule files under `output_dir` plus `.examples.md` files under `examples_output_dir` — the existing dedup target) and `staging_files` (the project-level staging file under `staging_output_dir` — for the staging-match branch added in the "Check for duplicates and route per category" step below). In Conversation mode these are passed via the Step C2 subagent prompt boundary; in PR Review mode, Update Mode, and Conversation Candidate Apply Mode (all defer to this Step C5 for the staging-match criterion) the main agent reads both file-sets directly with no prompt boundary — the tagging is conceptual in those cases.
 
 2. Categorize each extracted item (rule files written under `output_dir`):
    - Language-specific → `<output_dir>/languages/<lang>.md`
@@ -127,6 +168,6 @@ When item 4 creates `<staging_output_dir>/project.staging.local.md` for the firs
 
 ## Mode interaction summary
 
-For the per-mode read / write / promote behavior on the staging file, see the main SKILL.md § Update Mode "Staging awareness" paragraph (Update reads + promotes but does not write; Conversation / PR Review read + write + promote; Full Extraction / Restructure / Compaction leave staging untouched).
+For the per-mode read / write / promote behavior on the staging file, see the main SKILL.md § Update Mode "Staging awareness" paragraph (Update reads + promotes but does not write; Conversation / PR Review / Conversation Candidate Apply read + write + promote; Full Extraction / Restructure / Compaction leave staging untouched).
 
-**Edge case — Full Extraction over a pre-populated staging directory**: Full Extraction (`/extract-rules` without flags) errors out when `<output_dir>` already exists, so the realistic Full Extraction trajectory is greenfield. If a user has previously run `--from-conversation` (populating staging) and then manually deletes `<output_dir>` before re-running Full Extraction, the staging file persists outside `<output_dir>` and Full Extraction silently ignores it — the next `--from-conversation` / `--from-pr` / `--update` run can still promote those staged candidates against the freshly rebuilt canonical. If the staged candidates are no longer relevant after the rebuild, delete the staging directory manually before re-running incremental modes.
+**Edge case — Full Extraction over a pre-populated staging directory**: Full Extraction (`/extract-rules` without flags) errors out when `<output_dir>` already exists, so the realistic Full Extraction trajectory is greenfield. If a user has previously run `--from-conversation` (populating staging) and then manually deletes `<output_dir>` before re-running Full Extraction, the staging file persists outside `<output_dir>` and Full Extraction silently ignores it — the next `--from-conversation` / `--from-pr` / `--update` / `--apply-conversation-candidates` run can still promote those staged candidates against the freshly rebuilt canonical. If the staged candidates are no longer relevant after the rebuild, delete the staging directory manually before re-running incremental modes.

@@ -23,6 +23,7 @@ Analyzes existing codebase to identify what Claude would get wrong without proje
 /extract-rules --from-pr owner/repo#100..110   # PR range (another repo)
 /extract-rules --compact                       # Compact all over-threshold rules files (output_dir/**/*.md)
 /extract-rules --compact path/to/file.md ...   # Compact specific files (caller passes explicit paths)
+/extract-rules --apply-conversation-candidates <path>  # Apply pre-scanned rule candidates (Step C5 only; orchestrator sub-skill)
 # Multiple specs allowed (space-separated) → cross-analysis detects org-wide principles
 ```
 
@@ -39,7 +40,7 @@ Settings file: `extract-rules.local.md` (YAML frontmatter only, no markdown body
 | `exclude_patterns` | `[]` | Exclude file patterns (e.g., `*.generated.ts`, `*.d.ts`) |
 | `output_dir` | `.claude/rules` | Output directory for rule files (`.md` and `.local.md`). This directory is inside Claude Code's `.claude/rules/**` recursive auto-load scope, so every file written here is injected into context on session start |
 | `examples_output_dir` | `.claude/rules-extras` | Output directory for `.examples.md` files. Defaults to a sibling directory **outside** `.claude/rules/**` so examples are not auto-loaded into context on session start. Set to `output_dir` (or any path under `output_dir`) to opt examples back into auto-load |
-| `staging_output_dir` | `.claude/rules-staging` | Output directory for staged project-level patterns extracted in incremental modes (`--from-conversation` / `--from-pr`). On 1st observation, project-level patterns land here; on 2nd observation (matched in a later incremental run or by `--update`), they are promoted to `<output_dir>/project.md` and removed from staging. Defaults to a sibling directory **outside** `.claude/rules/**` so staged candidates are not auto-loaded into context on session start. Set to `output_dir` (or any path under `output_dir`) to opt staging back into auto-load. Language / framework / integration patterns bypass staging and land directly in their respective `.local.md` files (gating is scoped to project-level patterns). Note: uncommitted staging files are therefore invisible to downstream automation that watches only `output_dir` — `dev-workflow`'s Completion section explicitly surfaces them as a reminder so candidates are not silently left behind. |
+| `staging_output_dir` | `.claude/rules-staging` | Output directory for staged project-level patterns extracted in incremental modes (`--from-conversation` / `--from-pr` / `--apply-conversation-candidates`). On 1st observation, project-level patterns land here; on 2nd observation (matched in a later incremental run or by `--update`), they are promoted to `<output_dir>/project.md` and removed from staging. Defaults to a sibling directory **outside** `.claude/rules/**` so staged candidates are not auto-loaded into context on session start. Set to `output_dir` (or any path under `output_dir`) to opt staging back into auto-load. Language / framework / integration patterns bypass staging and land directly in their respective `.local.md` files (gating is scoped to project-level patterns). Note: uncommitted staging files are therefore invisible to downstream automation that watches only `output_dir` — `dev-workflow`'s Completion section explicitly surfaces them as a reminder so candidates are not silently left behind. |
 | `language` | `ja` | Report language (e.g., `ja`) |
 | `split_output` | `true` | Separate Principles (.md) and patterns (.local.md) |
 | `resolve_references` | `true` | Resolve file references during restructure |
@@ -171,6 +172,7 @@ Check arguments to determine mode:
 - `--from-conversation [session-id]` → **Conversation Extraction Mode** (Step C1-C5)
 - `--compact [<paths>]` → **Compaction Mode** (Step CP1-CP5)
 - `--from-pr <number|owner/repo#number|range> [...]` → **PR Review Extraction Mode** (Step P1-P5)
+- `--apply-conversation-candidates <path>` → **Conversation Candidate Apply Mode** (Step A1-A2)
 
 ---
 
@@ -255,7 +257,7 @@ Also analyze non-code documentation:
 
 Extract explicit coding rules and guidelines from these documents.
 
-**Deduplication check:** Read any files under `.claude/rules/` to build a set of already-documented rules. Rules extracted in Step 4 that overlap with these existing rules should be skipped to avoid duplication. Note: CLAUDE.md is NOT a deduplication source — rules should exist in `.claude/rules/` even if also mentioned in CLAUDE.md, because rule files are portable across projects via merge-rules. This check applies to all modes (Full Extraction, Update, Conversation, PR Review).
+**Deduplication check:** Read any files under `.claude/rules/` to build a set of already-documented rules. Rules extracted in Step 4 that overlap with these existing rules should be skipped to avoid duplication. Note: CLAUDE.md is NOT a deduplication source — rules should exist in `.claude/rules/` even if also mentioned in CLAUDE.md, because rule files are portable across projects via merge-rules. This check applies to all modes (Full Extraction, Update, Conversation, Conversation Candidate Apply, PR Review).
 
 ### Step 6: Generate Output
 
@@ -347,7 +349,7 @@ After generating all rule files, verify no sensitive information was included:
    - Internal URLs: `(internal|staging|localhost:[0-9]+)`
 2. If found, redact with placeholders (e.g., `API_KEY_REDACTED`) and warn the user
 
-**Note:** This check applies to all modes that generate or update rule files (Full Extraction, Update, Restructure, Conversation Extraction). Also check `.examples.md` files — they contain actual code from the codebase and may include sensitive information.
+**Note:** This check applies to all modes that generate or update rule files (Full Extraction, Update, Restructure, Conversation Extraction, Conversation Candidate Apply). Also check `.examples.md` files — they contain actual code from the codebase and may include sensitive information.
 
 ### Step 7: Report Summary
 
@@ -514,6 +516,24 @@ Include in the agent prompt:
 - The subagent instructions from `references/conversation-mode.md`
 
 After the subagent completes, report the results to the user.
+
+---
+
+## Conversation Candidate Apply Mode
+
+When `--apply-conversation-candidates <path>` is specified, run **only Step C5** (dedup / route / write / promote / `.examples.md` / Security Self-Check) against a pre-scanned rule-candidate block, skipping the jsonl parsing and analysis (C3/C4). The candidates are produced by the caller — typically a shared conversation scan in an orchestrator such as `dev-workflow` — so this mode is the **apply** half of a scan/apply split. For standalone testing, pass a hand-authored candidate file.
+
+The input candidate file conforms to `references/conversation-mode.md` § Rule-candidate contract. This mode runs entirely in the **main agent** (no subagent spawn): the input is already sanitized and small, so the context-isolation rationale that Conversation Extraction Mode's Step C2 subagent serves does not apply — this mirrors how Update Mode and PR Review Mode run Step C5 directly (see `references/conversation-mode.md` § Step C5 item 1).
+
+### Step A1: Load Settings and Read Candidates (main agent)
+
+1. Load settings from `extract-rules.local.md` (same as Step 1 in Full Extraction Mode).
+2. Check the output directory exists (default `.claude/rules/`); if not, Error "Run /extract-rules first to initialize rule files." (same as Step C1's output-directory-existence check).
+3. Read the candidate file at `<path>` and validate it against `references/conversation-mode.md` § Rule-candidate contract: each `### Candidate <N>` carries the required fields, `Type` / `Category` hold enum values, and the trailing `Candidates: <N>` count matches the number of parsed `### Candidate` blocks. On an empty file, a parse failure, a count mismatch, or any candidate that omits a field its `Type` / `Category` discriminators mark required-non-empty (per the contract's Fields section — e.g. a `Type: pattern` candidate with an empty `Signature`), stop with a fail-loud diagnostic naming the path and the validation failure — do not silently proceed with a partial candidate set.
+
+### Step A2: Apply via Step C5 (main agent)
+
+Execute `references/conversation-mode.md` § Step C5 with the Step A1 candidate list standing in for C4's in-context extracted items, running **directly in the main agent** (no subagent — see the mode intro above). Step C5 item 1 resolves `canonical_files` / `staging_files` from settings directly (no prompt boundary). Step C5 then performs dedup / routing / staging append+promote / `.examples.md` generation (mined from the codebase per `references/examples-format.md`) / Security Self-Check, and returns its counter summary. Report to the user using the `references/report-templates.md` § Conversation Extraction Mode (Step C4) template, reused as-is (its `### Promoted from staging` / `### Newly staged` / `### No changes` subsections apply unchanged) — no new template section is added.
 
 ---
 
@@ -687,7 +707,7 @@ Read `references/pr-review-mode.md` for the full processing steps (P1-P5). Key f
 
 When invoked as a sub-skill (i.e. via `Skill(extract-rules)` from an orchestrator such as `dev-workflow` Step 11), the fenced JSON verdict block this skill emits in `--compact` mode is the **structured return value** of the skill's procedure — it is **not** a deliverable to the user, and emitting it does **not** terminate the orchestrator's turn. The same agent that ran this skill must immediately issue the next tool call dictated by the orchestrator's flow (see `dev-workflow` SKILL.md `§ No-Stall Principle`; orchestrators that surface a per-callee guidance bullet — e.g. `dev-workflow`'s `**Pre-invocation reminder**` in its `references/update-rules.md` § Char-count compaction gate (Step 11 sub-step 3) — name the specific next action there). Do not insert a prose summary, an acknowledgment, or a "shall I proceed?" sentence between the JSON verdict and the next tool call. Only one fenced JSON block — the verdict block — appears in the response, so callers can locate it unambiguously. The skill's own procedure is over; the orchestrator's procedure continues without pause.
 
-This directive applies specifically to `--compact` mode. Other modes (Full Extraction, Update, Restructure, Conversation, PR Review) produce prose reports rather than fenced JSON verdicts and are not subject to this contract.
+This directive applies specifically to `--compact` mode. Other modes (Full Extraction, Update, Restructure, Conversation, Conversation Candidate Apply, PR Review) produce prose reports rather than fenced JSON verdicts and are not subject to this contract.
 
 ---
 
