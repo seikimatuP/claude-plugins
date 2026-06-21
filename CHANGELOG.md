@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-21
+
+### extract-rules v1.21.0 / dev-workflow-bundle v1.76.0
+
+- feat(extract-rules): add Conversation Candidate Apply Mode (`--apply-conversation-candidates <path>`) — the apply half of a scan/apply split for `--from-conversation` (jsonl-scan-unification subtask 1)
+  - The new mode runs **only Step C5** (dedup / route / write / promote / `.examples.md` / Security Self-Check) against a pre-scanned rule-candidate block, skipping the jsonl parse + analysis (C3/C4). It runs in the main agent with no subagent spawn, mirroring how Update Mode / PR Review Mode invoke Step C5 directly (the input is already sanitized, so the context-isolation rationale for Conversation Mode's Step C2 subagent does not apply). Intended caller: a shared conversation scan in an orchestrator such as `dev-workflow` (the wiring lands in a follow-up subtask); usable standalone with a hand-authored candidate file.
+  - New `references/conversation-mode.md` § Rule-candidate contract formalizes the C4 → C5 interface as a serializable block reusing the shared session-scan's `### Candidate <N>` … `Candidates: <N>` **envelope** (only the envelope is shared — the field set is specific to this rule-extraction axis, not the workability axis's schema): `Type` (principle / pattern) + `Category` (language / framework / integration / project) + `Name` / `Signature` / `Context` / `Rule`, with per-field conditional required-ness and a written-bullet mapping. The staging 3-branch fires exactly when `Type == pattern` AND `Category == project`; every other combination writes canonical directly, reproducing Step C5 item 3's existing routing.
+  - **No behavior change to standalone modes**: the existing C1–C5 `--from-conversation` path is untouched (the contract is conceptual there), and Step C5's routing / dedup / write body is unchanged — apply-only framing was added additively. Mode-enumeration lists across `SKILL.md` and `references/{conversation-mode,examples-format,extraction-criteria}.md` were extended to include the new mode.
+  - canonical `SKILL.md` / `references/` and the `dev-workflow-bundle` copy synced byte-identical.
+
 ## 2026-06-20
 
 ### dev-workflow v1.74.7 / dev-workflow-bundle v1.75.7
