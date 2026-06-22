@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-22
+
+### dev-workflow v1.75.0 / dev-workflow-bundle v1.77.0
+
+- feat(dev-workflow): **Behavior change** — Step 11 rule extraction now runs via the shared session scan + `extract-rules --apply-conversation-candidates` (apply-only) instead of a direct `extract-rules --from-conversation` call, folding the prose coding-rule axis into the shared conversation scan and cutting large-text subagent ingestion per run from 2 to 1 (jsonl-scan-unification subtask 2)
+  - `references/session-scan.md` is generalized from 2 axes to 3 (rule-extraction / self-retrospective / workability). The dispatch-once contract generalizes to "the first participating step in execution order (Step 11 → 11.5 → 11.6) with an active axis of its own to consume dispatches the shared scan"; Step 11 is the new earliest dispatcher when `rule-extraction-active`, and it includes the self-retrospective axis **speculatively** (gated on Step-1 registration, validated at consume time by Step 11.5's own pre-flight). The session jsonl is resolved once by the dispatcher, so every axis describes the same session.
+  - New `references/rule-extraction-axis.md` is the self-contained producer spec the shared scan's subagent reads (extraction criteria + the `--- RULE-CANDIDATES ---` block shape with discriminator-conditioned field required-ness + sanitization). Its field-schema source of truth is `extract-rules` `references/conversation-mode.md` § Rule-candidate contract, which `extract-rules` Conversation Candidate Apply Mode (Step A1) validates fail-loud.
+  - Failure routing: a whole-scan `Status: ERROR` (unreadable jsonl) skips rule-extraction like the sibling axes; a per-axis malformed / missing rule block (jsonl parsed fine) falls back to standalone `extract-rules --from-conversation` — the one axis with a standalone fallback worker. The `rule-extraction-active` gate (the existing `--from-conversation` skip conditions) suppresses both the apply-only path and its fallback, preserving the staging double-count defense.
+  - The `Agent`-tool dispatch-site accounting (still three sites), the `subagent_model` / `session_scan_dispatched` / `session_scan_result` read / set sites, the § Workflow artifacts list (`.claude/plans/<slug>.rule-candidates.md`), and the Completion cleanup were extended to include Step 11.
+  - canonical `SKILL.md` / `references/` and the `dev-workflow-bundle` copy synced byte-identical.
+
+### extract-rules v1.21.1 / dev-workflow-bundle v1.77.0
+
+- docs(extract-rules): point `references/conversation-mode.md` § Rule-candidate contract's forward-reference at the now-existing producer — `dev-workflow`'s rule-extraction axis (`references/rule-extraction-axis.md`) — completing the bidirectional cross-skill contract reference (jsonl-scan-unification subtask 2)
+  - No behavior change: the contract itself (field set, conditional required-ness, staging routing) is unchanged; only the "a future shared-scan rule-extraction axis would define the fields" forward-reference now names the concrete producer.
+  - canonical `SKILL.md` / `references/` and the `dev-workflow-bundle` copy synced byte-identical.
+
 ## 2026-06-21
 
 ### extract-rules v1.21.0 / dev-workflow-bundle v1.76.0
