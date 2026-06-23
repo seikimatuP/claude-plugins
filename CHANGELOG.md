@@ -2,6 +2,14 @@
 
 ## 2026-06-23
 
+### prose-polish v1.1.0 / dev-workflow-bundle v1.80.0
+
+- feat(prose-polish): expand Japanese rules in `prose-style-guide.md` to cover patterns that large verbose models commonly produce
+  - **Rule 6 — Verbose politeness forms (丁寧語の過剰形)**: shorten 「〜となります」（static state only）→「〜です」, 「〜させていただく」（when extra courtesy is unnecessary）→「〜します」, filler 「〜のほう」→ delete, and chained 「〜ということ」→ omit. Each pattern includes a "do not apply when meaning changes" guard so the refactor subagent does not alter genuine state-change constructions or deliberate courtesy contexts
+  - **Rule 7 — Register consistency (敬体/常体の統一)**: instruct the subagent to identify and maintain the register (敬体 or 常体) established by the surrounding prose, and not to mix the two within the same document or section
+  - **Two new before/after samples**: an AI-generated explanation (説明文) and an over-polite instruction (指示文), complementing the existing code-comment and test-description samples so the style guide covers non-code prose that the skill's text mode polishes
+  - canonical `references/prose-style-guide.md` and the `dev-workflow-bundle` copy synced byte-identical
+
 ### prose-polish v1.0.0 / dev-workflow-bundle v1.79.0
 
 - feat(prose-polish): new bundled skill that refactors verbose / unnatural natural-language prose into concise, native-sounding text in a configured target language (default `ja`) using a sonnet subagent by default
