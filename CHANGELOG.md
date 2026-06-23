@@ -1,6 +1,37 @@
 # Changelog
 
+## 2026-06-23
+
+### dev-workflow v1.76.0 / dev-workflow-bundle v1.78.0
+
+- fix(dev-workflow): remove the default visual plan-review gate timeout — wait up to 24h (effectively no timeout) instead of 300 s
+  - **Behavior change** — the visual plan-review gate (`visual_plan_review`) no longer falls back to chat after 300 s; it waits for the browser submit up to a 24h cap. Waiting costs no tokens (the caller blocks on a harness-tracked background process), so the long wait has no runtime cost
+  - Category: wrong-default; reverses auto-triage #131 (which had cut the timeout 1800 s → 300 s). `references/visual-plan-review.md` no longer passes `--timeout 300`; `serve.mjs`'s `DEFAULT_TIMEOUT_SEC` is now `86400` (24h, kept under `setTimeout`'s ~24.8-day ceiling) and the timer arms only when `timeoutMs > 0`, so `--timeout 0` now means "no timeout (wait indefinitely)" via a `0` sentinel (sibling of the existing `--port 0` sentinel). The 24h finite default keeps an automatic chat-fallback escape hatch for an abandoned gate, since manual cancellation of the background wait is surface-dependent
+  - **Opt-out**: pass `--timeout 0` for truly no timeout, or `--timeout <sec>` for a custom cap (not exposed via YAML config; set on the `serve.mjs` launch in `references/visual-plan-review.md`)
+  - canonical `serve.mjs` / `references/visual-plan-review.md` and the `dev-workflow-bundle` copy synced byte-identical
+
 ## 2026-06-22
+
+### dev-workflow v1.75.1 / dev-workflow-bundle v1.77.1
+
+- fix(dev-workflow): add Decomposed-run state-file guard item to Step 9 Completion Hooks (auto-triage #130)
+  - Category: missing-branch; a new pre-call check item instructs the agent to verify that hook post-processing actions (move / archive) will not touch active decomposed-run state files before invoking the hook; if they would, the agent suppresses that hook step and records why — replacing ad-hoc reasoning with a defined branch
+  - canonical `SKILL.md` and the `dev-workflow-bundle` copy synced byte-identical
+
+- fix(dev-workflow): add language checkpoint after Step 1 sub-step 5 language resolution (auto-triage #128)
+  - Category: missing-branch; a one-line informational note (e.g. "Output language: ja") is emitted after `language` is resolved so the orchestrator and user can confirm the resolved value without having to re-read Step 1
+  - canonical `SKILL.md` and the `dev-workflow-bundle` copy synced byte-identical
+
+- fix(dev-workflow): add Verification slot as the fourth element in the per-commit accept gate presentation (auto-triage #128)
+  - Category: missing-branch; `references/interactive-commits.md` § Per-commit loop `a. Present` now renders a one-line Step 7 outcome summary (checks / tests result) as the fourth of five closed-list elements (Subject / Body / Files / Verification / Diff), so the user sees test status before approving each commit
+  - canonical `references/interactive-commits.md` and the `dev-workflow-bundle` copy synced byte-identical
+
+- fix(dev-workflow): reduce default visual plan-review gate timeout from 1800 s to 300 s (auto-triage #131)
+  - Category: wrong-default; `references/visual-plan-review.md` Step 4 launch now passes `--timeout 300` to `serve.mjs`, capping the gate at 5 minutes so an unattended run falls back to the chat-approval path promptly instead of blocking for up to 30 minutes
+
+- fix(dev-workflow): add block placement hierarchy check sub-check (ix) to Step 5 sub-step 4 (auto-triage #127)
+  - Category: missing-branch; when adding a new structural element (test block, list item, section) inside an existing file, sub-check (ix) now requires the agent to confirm whether the new element is nested inside a parent scope and, if so, whether the parent's setup / preconditions are intentionally applicable; if they are not, the agent must relocate the element before proceeding
+  - canonical `SKILL.md` and the `dev-workflow-bundle` copy synced byte-identical
 
 ### dev-workflow v1.75.0 / dev-workflow-bundle v1.77.0
 
