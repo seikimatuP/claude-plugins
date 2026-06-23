@@ -2,6 +2,14 @@
 
 ## 2026-06-23
 
+### dev-workflow v1.76.1 / dev-workflow-bundle v1.81.1
+
+- fix(dev-workflow): make the Step 4 visual plan-review gate the unconditional default action on the `visual_plan_review: true` path, instead of a surface the agent pre-branches on guessed browser reachability
+  - Category: ambiguity; on path (b) the agent was told to "choose the approval surface" between a `Local browser reachable → visual gate` bullet and a `Browser unreachable → chat` bullet, but reachability is determined only inside `references/visual-plan-review.md` (its step 2 `printenv CLAUDE_CODE_REMOTE` check) — the very bullet the agent had to read to learn reachability. Under No-Stall pressure the agent resolved the circular precondition by guessing the cheaper branch (chat), never read the reference, never launched `serve.mjs`, so the plan was never displayed in the browser
+  - Step 4 sub-step 2 path (b) now makes "read and follow `references/visual-plan-review.md`" the unconditional default action; the reference owns the reachability determination and returns `fallback` when the browser is unreachable, and the chat-approval path is entered only on that `fallback` return. An anti-skip guard flags skipping-the-reference-under-No-Stall as a defect that silently disables the gate
+  - synced the same de-triggered framing across the other reachability-mentioning sites: the Configuration `visual_plan_review` bullet ("only if the local browser is reachable" → "always runs the gate via the reference, which detects reachability itself"); the § No-Stall Principle gate enumeration and the `Agent` tool-usage bullet (both reframed so an unreachable browser surfaces as the reference's `fallback` rather than an up-front-tested condition); and the `references/visual-plan-review.md` intro (dropped the "and the local browser is reachable" precondition; the reference now states it owns the reachability determination)
+  - canonical and `dev-workflow-bundle` copy synced byte-identical
+
 ### prose-polish v1.2.0 / dev-workflow-bundle v1.81.0
 
 - refactor(prose-polish): remove all before/after samples from `prose-style-guide.md`; rely on the rules alone so the subagent exercises its own judgment rather than pattern-matching to the examples
