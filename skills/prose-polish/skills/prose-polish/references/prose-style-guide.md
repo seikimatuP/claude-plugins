@@ -43,39 +43,3 @@ Models prone to verbosity tend to produce Japanese that reads as translated-from
 ## English (`en`) and other languages
 
 Apply the general rules above. For English specifically: prefer short Anglo-Saxon verbs over Latinate nominalizations, cut throat-clearing introductions, and break long subordinate-clause chains into separate sentences. For any other target language, apply the general rules and the same "read as native, not translated" standard.
-
-## Paired bilingual before / after samples
-
-These demonstrate the runtime rewrite for each target language (the skill rewrites prose in whichever language `Language:` resolves to). Code and identifiers stay verbatim across the rewrite.
-
-**`language: ja`** — a verbose Japanese code comment:
-
-- Before: `// この関数は、引数として渡されたユーザーIDを使用することによって、データベースからユーザー情報を取得するという処理を行います。`
-- After: `// 渡された userId でユーザー情報を DB から取得する。`
-
-**`language: ja`** — a redundant test description:
-
-- Before: `it("ユーザーが存在しない場合において、nullが返却されるということを確認するテスト", ...)`
-- After: `it("ユーザーが存在しなければ null を返す", ...)`
-
-**`language: ja`** — a verbose AI-generated explanation (説明文):
-
-- Before: 「この機能を使用することによって、ファイルの内容を自動的に変換させていただくことが可能となっております。」
-- After: 「この機能を使うと、ファイルの内容を自動で変換できます。」
-
-**`language: ja`** — an over-polite instruction (指示文):
-
-- Before: 「設定のほうを変更していただく必要がございます。まず最初に設定ファイルを開いていただきまして、該当の値をご変更ください。」
-- After: 「設定を変更してください。設定ファイルを開き、該当の値を書き換えます。」
-
-**`language: en`** — a verbose English comment:
-
-- Before: `// This function is responsible for performing the retrieval of the user information from the database by making use of the provided user ID.`
-- After: `// Fetch the user record from the DB by userId.`
-
-**`language: en`** — a nominalized sentence:
-
-- Before: `Make a determination as to whether the configuration value is present before the execution of the validation step.`
-- After: `Check whether the config value is present before validating.`
-
-Note how `userId` / `null` / `it(...)` / `DB` stay verbatim in every rewrite — only the natural-language wording around them changes.
