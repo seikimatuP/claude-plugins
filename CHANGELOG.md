@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-25
+
+### dev-workflow v1.78.1 / dev-workflow-bundle v1.83.1
+
+- fix(dev-workflow): surface review-class hook write divergence at the Step 9 boundary (auto-triage #133)
+  - Category: missing-branch; Step 9 now reconciles each review-class entry's reported `applied_edits_count` against the actual working-tree change it produced and records a non-fatal `review-class write divergence` warning at the hook boundary, so a findings-only reviewer that silently self-applies an edit is surfaced before the Step 10 commit gate (Step 10's Post-hook attribution check still owns resolution)
+  - canonical `skills/dev-workflow/skills/dev-workflow/` and the `dev-workflow-bundle` copy synced byte-identical
+
+### rules-review v1.4.2 / dev-workflow-bundle v1.83.1
+
+- fix(rules-review): resolve out-of-tree pointer rules before review; surface unresolvable pointers as coverage gaps (auto-triage #134)
+  - Category: missing-branch; a rule file that defers its body to an out-of-tree `@`-reference was embedded as an empty stub, so the reviewer judged against empty rules and returned clean. Data prep now resolves the reference and embeds the actual rule text, or — when the reference is unresolvable — drops the rule and records an explicit `(rule not evaluated — unresolved pointer to <ref>)` coverage-gap synthetic entry instead of a silent pass (a `coverage gap only` reason token was added to the Return contract enum)
+  - canonical `skills/rules-review/skills/rules-review/` and the `dev-workflow-bundle` copy synced byte-identical
+
 ## 2026-06-24
 
 ### dev-workflow v1.78.0 / dev-workflow-bundle v1.83.0
