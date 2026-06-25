@@ -123,6 +123,7 @@ Before launching reviewers, **prepare the data to embed in each prompt** (do NOT
 - For each group, run `git diff <base-commit> -- <matched-files>` using the **union of files matched by any rule in that group** (so each reviewer sees every file it is responsible for, and the same file may appear in diffs for multiple groups if multiple rules match it).
 - For each rule file, check if a corresponding `.examples.md` exists (same basename, e.g., `rails-controllers.md` → `rails-controllers.examples.md`) and read its content.
 - If no `.examples.md` exists for any rule in the group, omit the `## Reference: Code Examples` section entirely from that reviewer prompt (do not write a placeholder line like `(no examples file)`).
+- **Resolve pointer rules before embedding**: if a matched rule file carries no inline enforceable rule text and instead defers its substance to a document outside the scanned tree via a reference link (an `@<path>` include, or a markdown link to a doc outside `.claude/rules/`), resolve that reference and `Read` the target so the embedded `## Rules to Check` content is the actual rule text — embedding the bare pointer would make the reviewer judge against empty rules and return `No rule violations found` even when the referenced rule is violated. If the reference cannot be resolved (target missing, or outside readable scope), do **not** embed an empty stub: drop the rule from the group and record it as an explicit coverage gap per § 6. Aggregate Results, so an unread rule is never silently reported as compliant.
 - When multiple rule files are embedded in one reviewer prompt, separate them with a `### <.claude/rules/... path>` sub-heading inside the `## Rules to Check` section.
 
 For each reviewer:
@@ -141,6 +142,7 @@ For each reviewer:
    - Keep `low-confidence` findings in the list with their marker preserved — do not drop them.
 4. Edge cases:
    - If a reviewer returns an empty response or a response that does not match either `No rule violations found` or the violation format, retry that group once. If it fails again, include a synthetic entry in the final output under the group name with `Rule file: (review failed)`, `Description: reviewer returned unparseable output`, and continue aggregation for other groups.
+   - If a rule was dropped during data prep because it is an unresolvable pointer (see § 5's **Resolve pointer rules before embedding** bullet), include a synthetic entry in the final output with `Rule file: (rule not evaluated — unresolved pointer to <ref>)` and `Description: rule body deferred to an out-of-tree document that could not be resolved; left unevaluated rather than reported clean`. These coverage-gap entries are treated the same as `(review failed)` synthetic entries for the verdict (see `## Return contract`) — they surface loudly instead of letting an unread rule pass silently as `No rule violations found`.
    - If a reviewer returns only `low-confidence` findings (no high-confidence violations), still emit the violation list — do not substitute `No rule violations found`.
 
 ## Output Format
@@ -190,8 +192,8 @@ Emit a single fenced JSON block at the end of the response, matching the schema 
 Status mapping (evaluate in order, first match wins):
 
 - `no-issues` — no changed files (§ 1. Prepare), no rule files (§ 2. Collect Rules), no applicable rules (§ 4. Group Rules by Category), or all groups returned exactly `No rule violations found` (the all-clean branch of § 6. Aggregate Results). `violations_count: 0`, `reason: null`.
-- `error` — the review could not be produced: diff collection failed (§ 1. Prepare), matched rule files could not be read (§ 3. Match Rules to Changed Files), or **every** reviewer group failed to return parseable output (the consolidated violation list in § 6. Aggregate Results is entirely `(review failed)` synthetic entries). `violations_count: 0`, `reason` = the matching closed-enum string below. The § 6. Aggregate Results prose still renders the `(review failed)` entries; only the verdict status reflects that the whole review failed.
-- `violations` — the consolidated violation list (§ 6. Aggregate Results) holds at least one real finding (`high` / `low-confidence` / `rule-doc-drift`), possibly mixed with `(review failed)` synthetic entries. `violations_count` = total entries in that list. `reason: null`.
+- `error` — the review could not be produced: diff collection failed (§ 1. Prepare), matched rule files could not be read (§ 3. Match Rules to Changed Files), or **every** reviewer group failed to return parseable output (the consolidated violation list in § 6. Aggregate Results is entirely synthetic non-evaluation entries — `(review failed)` and/or `(rule not evaluated — ...)` coverage gaps). `violations_count: 0`, `reason` = the matching closed-enum string below. The § 6. Aggregate Results prose still renders those synthetic entries; only the verdict status reflects that the whole review failed.
+- `violations` — the consolidated violation list (§ 6. Aggregate Results) holds at least one real finding (`high` / `low-confidence` / `rule-doc-drift`), possibly mixed with `(review failed)` and/or `(rule not evaluated — ...)` coverage-gap synthetic entries. `violations_count` = total entries in that list. `reason: null`.
 
 Field rules:
 
@@ -200,6 +202,7 @@ Field rules:
   - `"diff collection failed"` — § 1. Prepare produced no usable changed-file list.
   - `"rule loading failed"` — matched rule files could not be read in § 3. Match Rules to Changed Files.
   - `"verdict parse failure"` — every reviewer group returned unparseable output even after the retry (see the `error` status-mapping bullet above). A single group failing while at least one other parses stays counted under `violations`, not a top-level `error`.
+  - `"coverage gap only"` — the consolidated list is entirely `(rule not evaluated — ...)` coverage-gap entries from unresolvable pointers (§ 5's **Resolve pointer rules before embedding** bullet) with no reviewer group having run, so no rule was actually evaluated. Use this token when the whole-review `error` arises solely from dropped pointer rules rather than from a diff / rule-load failure or unparseable reviewer output.
 
 ## Sub-skill caller directive
 
