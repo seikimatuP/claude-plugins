@@ -2,6 +2,12 @@
 
 ## 2026-06-25
 
+### dev-workflow v1.78.2 / dev-workflow-bundle v1.84.1
+
+- fix(dev-workflow): add anti-skip guard for prose-polish dispatch when `polish_prose: true` (auto-triage #140)
+  - Category: missing-branch; when `polish_prose: true` and sub-step 1.5's Prose-language self-audit returned clean, an implicit skip path allowed the prose-polish dispatch to be omitted. Added `**Anti-skip guard**` to foreclose that path, clarifying that the self-audit corrects language-translation errors while prose-polish refines naturalness and fluency — the two roles are distinct so the dispatch is required even when the self-audit passes
+  - canonical `skills/dev-workflow/skills/dev-workflow/` and the `dev-workflow-bundle` copy synced byte-identical
+
 ### tidy v1.4.0 / dev-workflow-bundle v1.84.0
 
 - feat(tidy): open behavior-preserving structural improvements to `mechanical_edit` so tidy's apply rate approaches the built-in `simplify`
