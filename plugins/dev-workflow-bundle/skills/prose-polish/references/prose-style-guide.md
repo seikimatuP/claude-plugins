@@ -34,6 +34,22 @@ The preserve-test outranks the translate-default, so a recognized proper noun (`
 5. **Match the surrounding register.** Keep terminology and tone consistent with the neighboring prose; do not introduce a synonym for a term already used nearby.
 6. **Translate ordinary vocabulary; don't code-mix.** Decide each source-language word by the Preserve section's `Preserve-vs-translate litmus test`: translate ordinary vocabulary that has a natural target-language equivalent, and keep the source-language form only for the proper nouns / identifiers / code the litmus test preserves. Dropping ordinary source-language words into target-language prose reads as unnatural to a native reader.
 
+## Cross-file duplicate comments (file mode, multiple files)
+
+This rule applies only when more than one file is polished in a single file-mode pass. It is the **canonical home** for what counts as a cross-file duplicate; the SKILL.md dispatch references it by name and owns how the finding is reported (the `recommendations` field).
+
+When the **same non-obvious knowledge** — a *why* / rationale / workaround / constraint / precondition note — appears as a comment in **two or more** of the target files, treat it as a **consolidation candidate**, not an in-place polish target. Do not polish each copy individually: the correct fix is to consolidate the knowledge into one canonical location (a doc or rule file) and remove the inline copies. This skill does not delete by default (the knowledge would be lost if the consolidation destination is not guaranteed), so it surfaces the finding as a recommendation rather than editing.
+
+A comment qualifies as a consolidation candidate only when **all** of these hold:
+
+- It carries **non-obvious knowledge** — a *why*: a constraint, an invariant, a workaround, a rationale, or a precondition. Pure *what*-narration does not qualify; General rule 2 (delete redundant *what*-narration) handles that, not consolidation.
+- The same knowledge appears in **two or more distinct files**. Repetition within a single file is ordinary restatement — handle it with General rule 3 (merge), not as a consolidation candidate.
+- The copies match on **normalized near-equivalence**: ignore comment markers, surrounding whitespace, and trivial wording differences, then check that the comments express the same essential knowledge — not merely that they share a keyword.
+
+Exclusions — legitimately repeated content that is **never** a consolidation candidate: license / copyright headers, generated-code banners, trivial section dividers or labels, and pure *what*-narration comments.
+
+Judge conservatively: flag only clear same-knowledge duplication across files. When in doubt, treat the comment as ordinary prose and polish it normally rather than emitting a recommendation.
+
 ## Japanese (`ja`) — primary use case
 
 Models prone to verbosity tend to produce Japanese that reads as translated-from-English. Fix these patterns:

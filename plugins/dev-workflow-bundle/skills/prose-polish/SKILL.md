@@ -24,14 +24,16 @@ The caller passes these fields in natural language (the skill extracts them from
 - `Language:` *(optional, default `ja`, e.g. `ja` / `en`)* — the target language whose prose is refactored. In file mode, only prose written in this language is rewritten; prose in other languages is left untouched.
 - `Model:` *(optional, default `sonnet`)* — the model id applied as the `model` parameter on the refactor `Agent` dispatch (Step 3 (a)). **Validity predicate**: a value is valid only if it is exactly one of the closed set `{sonnet, opus, haiku}` (the ids the `Agent` `model` parameter accepts); an absent field or any value outside that set (including a full `claude-*` id) falls back to the default `sonnet` — sonnet produces more concise, natural prose than the larger models this skill is meant to clean up after.
 
+**Pass related files together (file mode)** — cross-file duplicate-comment detection (`## Process` Step 3's `recommendations`) works only when the related files are listed together in a **single** file-mode invocation: the refactor subagent can spot a comment duplicated across files only when it sees those files in one dispatch.
+
 ### Mode determination
 
 Evaluate against the two mode selectors — the `File:` / `Files:` group and `Text:` — using the provided/absent rule above:
 
 - **`File:` / `Files:` provided AND `Text:` absent** → **file mode** (run `## Process` Steps 1–4 in the file-mode branch).
 - **`Text:` provided AND `File:` / `Files:` absent** → **text mode** (run `## Process` Steps 1–4 in the text-mode branch).
-- **Both provided** → return early with `{"status": "error", "mode": null, "language": "<resolved>", "applied_edits_count": 0, "files_modified": [], "refactored_text": null, "reason": "ambiguous args"}` — two modes were requested at once; surfaced loudly rather than silently picking one.
-- **Both absent** → return early with `{"status": "error", "mode": null, "language": "<resolved>", "applied_edits_count": 0, "files_modified": [], "refactored_text": null, "reason": "incomplete args"}` — no mode could be selected.
+- **Both provided** → return early with `{"status": "error", "mode": null, "language": "<resolved>", "applied_edits_count": 0, "files_modified": [], "recommendations": [], "refactored_text": null, "reason": "ambiguous args"}` — two modes were requested at once; surfaced loudly rather than silently picking one.
+- **Both absent** → return early with `{"status": "error", "mode": null, "language": "<resolved>", "applied_edits_count": 0, "files_modified": [], "recommendations": [], "refactored_text": null, "reason": "incomplete args"}` — no mode could be selected.
 
 This fixed mode gate (one selector group present → that mode; both → ambiguous; neither → incomplete) surfaces a conflicting or empty argument set as a loud error rather than silently picking a mode. On both early-return errors `mode` is `null` (no mode was selected); callers branch on `status == "error"` + `reason`.
 
@@ -68,6 +70,8 @@ Dispatch a fresh subagent via the `Agent` tool (`subagent_type: general-purpose`
 > **Preserve everything that is not target-language prose (hard constraint)**: never change code, identifiers, function / variable / type names, proper-noun product / API / library / tool names and code symbols, import paths, or any string literal that carries program logic (keys, enum values, format specifiers, paths, commands). An **ordinary** source-language word sitting inside the target-language prose — a common verb, noun, or adjective with a natural target-language equivalent, not a proper noun or code symbol — is itself translatable prose, not a preserved token: render it in the target language per the PROSE STYLE GUIDE's `Preserve-vs-translate litmus test` rather than leaving it code-mixed. Leave a **whole** passage written entirely in another language untouched. If a candidate change could alter program behavior or touch a non-prose token, do not emit it.
 >
 > Return each rewrite as a `{file, old_string, new_string, rationale}` Edit. `old_string` must match exactly one location in the current file — include **1–3 lines of surrounding context** so the snippet is unique (short one-liners collide and cause the Edit to fail). A rewrite may reduce the number of prose lines: merge adjacent comment lines that state the same thing, or **delete** a comment whose only content is *what*-narration of the code beneath it (per the style guide's "say what the code does not" rule) by emitting an edit whose `new_string` omits that line — this is a prose change, not a structural code edit. Delete a comment only when it is fully redundant with the adjacent code; otherwise shorten it. When `old_string` carries a non-target line purely for uniqueness (an adjacent line in another language, or a code line), reproduce that line **byte-identically** in `new_string` so the preserve constraint is not breached. If a file needs no prose changes, emit no edits for it. If nothing needs changing across all files, return `edits: []`.
+>
+> **Cross-file duplicate comments → a `recommendations` entry, not per-copy edits**: when a comment qualifies as a cross-file duplicate under the PROSE STYLE GUIDE's `Cross-file duplicate comments` rule (which owns what qualifies, the exclusions, and the threshold), do **not** emit a per-copy polish edit for those copies — instead emit a single `recommendations` entry (see RESPONSE FORMAT) flagging the duplication. A comment that does not qualify is ordinary prose — polish it as usual. If nothing qualifies, return `recommendations: []`.
 
 **Response format — file mode (include verbatim in the dispatch):**
 
@@ -78,10 +82,15 @@ Dispatch a fresh subagent via the `Agent` tool (`subagent_type: general-purpose`
 > {
 >   "edits": [
 >     {"file": "<path>", "old_string": "<unique 1-3 line snippet>", "new_string": "<replacement>", "rationale": "<short reason>"}
+>   ],
+>   "recommendations": [
+>     {"summary": "<one-line description of the duplicated knowledge>", "files": ["<path>", "<path>"], "suggestion": "<consolidate-into-one-place-and-remove-inline-copies advice>"}
 >   ]
 > }
 > ```
 > ````
+>
+> `recommendations` holds cross-file duplicate-comment consolidation candidates (return `[]` when none qualify): `summary` identifies the duplicated knowledge in one line, `files` lists the **two or more** TARGET FILES the comment recurs in (the set, not ranked), and `suggestion` is the concrete consolidate-and-remove-copies advice — when it names a consolidation destination, phrase it as an illustrative example (e.g. a shared doc or rule file) rather than asserting a specific path, since the skill never verifies or dereferences it.
 
 **Refactor prompt — text mode (include verbatim in the dispatch):**
 
@@ -111,18 +120,18 @@ This single-pass parser evaluates the cases below in order, first match wins (th
 
 1. **Verdict missing or malformed** — no fenced JSON block found, or JSON parse fails → emit `{"status": "error", ..., "reason": "verdict parse failure"}` per `## Return contract` and stop.
 2. **Schema violation** — emit `{"status": "error", ..., "reason": "verdict schema violation"}` and stop when:
-   - **File mode**: `edits` is missing or not an array, or any entry fails its per-entry shape — each entry must have non-empty string `file`, `old_string`, and `new_string` (per-entry shape is validated **here at parse time**, before any `Edit`, so a malformed entry cannot crash a downstream `Edit` call).
+   - **File mode**: `edits` is missing or not an array, or any entry fails its per-entry shape — each entry must have non-empty string `file`, `old_string`, and `new_string` (per-entry shape is validated **here at parse time**, before any `Edit`, so a malformed entry cannot crash a downstream `Edit` call). The optional `recommendations` field, **when present**, must be an array in which every entry has a non-empty string `summary`, a non-empty string `suggestion`, and a `files` array of **two or more distinct non-empty strings** (duplicate paths within one entry are de-duplicated before the count check — not a violation); an **absent** `recommendations` is treated as `[]` (lenient). `recommendations[].files` entries are **not** scope-checked against `target_files` (advisory, never dereferenced).
    - **Text mode**: `refactored_text` is missing or is not a non-empty string.
 3. **Otherwise — apply (file mode) or accept (text mode)**:
-   - **File mode**: apply `edits` in order. For each entry, verify `file ∈ target_files`; if not, skip the entry without calling `Edit` (an out-of-scope write never occurs — no revert rail is needed). For each in-scope entry, call `Edit` (the Step 2 read is the baseline; re-`Read` the file first only if an earlier edit in this pass already modified it, so `old_string` matches the post-edit contents); if `old_string` is not found, skip that entry and continue (expected when two edits from one snapshot overlap a region an earlier edit already rewrote — a no-op skip, not an error). Increment `applied_edits_count` only for entries whose `Edit` call succeeded. Set `files_modified` to the distinct set of `file` values whose `Edit` succeeded, and `refactored_text = null`.
-   - **Text mode**: take `refactored_text` from the verdict. Set `applied_edits_count = 0` and `files_modified = []`.
+   - **File mode**: apply `edits` in order. For each entry, verify `file ∈ target_files`; if not, skip the entry without calling `Edit` (an out-of-scope write never occurs — no revert rail is needed). For each in-scope entry, call `Edit` (the Step 2 read is the baseline; re-`Read` the file first only if an earlier edit in this pass already modified it, so `old_string` matches the post-edit contents); if `old_string` is not found, skip that entry and continue (expected when two edits from one snapshot overlap a region an earlier edit already rewrote — a no-op skip, not an error). Increment `applied_edits_count` only for entries whose `Edit` call succeeded. Set `files_modified` to the distinct set of `file` values whose `Edit` succeeded, and `refactored_text = null`. Carry the validated `recommendations` through to the verdict **unchanged** — it is advisory and never applied; an absent / empty array becomes `[]`.
+   - **Text mode**: take `refactored_text` from the verdict. Set `applied_edits_count = 0`, `files_modified = []`, and `recommendations = []` (cross-file duplication is a file-mode-only concept).
 
 ### Step 4 — Emit verdict
 
 Determine `status` and emit the verdict per `## Return contract`:
 
-- **File mode**: `applied_edits_count > 0` → `done`; `applied_edits_count == 0` (no edits emitted, or every entry skipped as out-of-scope / not-found) → `no-change`.
-- **Text mode**: `refactored_text` differs from `input_text` → `done`; identical → `no-change`.
+- **File mode**: `applied_edits_count > 0` → `done`; `applied_edits_count == 0` (no edits emitted, or every entry skipped as out-of-scope / not-found) → `no-change`. `status` is computed from `applied_edits_count` alone — `recommendations` does **not** affect it (so a `no-change` verdict may still carry a non-empty `recommendations`). Emit the carried `recommendations` array in every file-mode verdict.
+- **Text mode**: `refactored_text` differs from `input_text` → `done`; identical → `no-change`. `recommendations` is always `[]`.
 
 ## Return contract
 
@@ -135,6 +144,7 @@ The skill emits a **single** fenced JSON block at the very end of the invocation
   "language": "<lang>",
   "applied_edits_count": N,
   "files_modified": ["<path>"],
+  "recommendations": [{"summary": "...", "files": ["<path>"], "suggestion": "..."}],
   "refactored_text": "...|null",
   "reason": "ambiguous args|incomplete args|verdict parse failure|verdict schema violation|dispatch error|null"
 }
@@ -146,12 +156,13 @@ Field semantics:
 
 - `status`:
   - `done`: refactoring was applied — file mode `applied_edits_count > 0`, or text mode `refactored_text` differs from the input.
-  - `no-change`: nothing needed refactoring — file mode `applied_edits_count == 0` (the subagent returned `edits: []`, or every entry was skipped as out-of-scope / `old_string` not found), or text mode `refactored_text` equals the input.
+  - `no-change`: no in-place edit was applied — file mode `applied_edits_count == 0` (the subagent returned `edits: []`, or every entry was skipped as out-of-scope / `old_string` not found), or text mode `refactored_text` equals the input. In file mode `recommendations` may still be non-empty, so read it independently of `status` (see the `recommendations` field below).
   - `error`: an early-return or dispatch error occurred — see `reason`.
 - `mode`: `"file"` or `"text"`, the resolved mode; `null` on the two `§ Mode determination` early-return errors (`ambiguous args` / `incomplete args`), where no mode was selected.
 - `language`: the **resolved** target language echoed back (`Language:` value, or the default `ja`).
 - `applied_edits_count`: non-negative integer count of `Edit` calls that succeeded (file mode). Always `0` in text mode and on any `error`.
 - `files_modified`: the distinct files that received at least one successful `Edit` (file mode); `[]` in text mode and on any `error`.
+- `recommendations`: file-mode advisory array of cross-file duplicate-comment consolidation candidates — each `{summary, files, suggestion}` flags a non-obvious comment recurring across two or more input files (see `## Process` Step 3's file-mode refactor prompt and the style guide's `Cross-file duplicate comments` rule). **Orthogonal to `status`**: present and possibly non-empty on both `done` and `no-change`; `[]` in text mode, on single-file or no-duplicate file-mode input, and on any `error`.
 - `refactored_text`: the rewritten text in text mode; `null` in file mode and on any `error`.
 - `reason`: enum string only when `status == "error"`, otherwise JSON `null`. Keep `reason` to the listed enum tokens — no free-form text — so the verdict stays mechanically parseable.
 
@@ -160,7 +171,7 @@ Field semantics:
 - `reason: "ambiguous args"` — both `File:` / `Files:` and `Text:` were provided (`§ Mode determination`).
 - `reason: "incomplete args"` — neither `File:` / `Files:` nor `Text:` was provided (`§ Mode determination`).
 - `reason: "verdict parse failure"` — no fenced JSON block in the subagent response, or JSON parse failed (Step 3 (b) sub-case 1).
-- `reason: "verdict schema violation"` — the JSON parsed but a required key is missing / wrong-typed, or an `edits` entry failed its per-entry shape (Step 3 (b) sub-case 2).
+- `reason: "verdict schema violation"` — the JSON parsed but a required key is missing / wrong-typed, or an `edits` entry (or a present `recommendations` entry) failed its per-entry shape (Step 3 (b) sub-case 2).
 - `reason: "dispatch error"` — the `Agent` dispatch itself errored, timed out, or returned an empty response (caught at Step 3 (a) Dispatch failure).
 
 ## Sub-skill caller directive
