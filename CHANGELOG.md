@@ -2,6 +2,15 @@
 
 ## 2026-06-26
 
+### dev-workflow v1.79.1 / ask-peer v2.4.4 / extract-rules v1.21.2 / rules-review v1.4.4 / tidy v1.4.1 / prose-polish v1.4.1 / dev-workflow-bundle v1.87.1
+
+- chore(plugins): revert the #57570 nested-layout workaround and restore the flat direct-skill layout
+  - [anthropics/claude-code#57570](https://github.com/anthropics/claude-code/issues/57570) — the v2.1.136 regression that rejected a marketplace entry's `"skills": ["./"]` with `Path escapes plugin directory` — is now CLOSED/COMPLETED. Verified the fix on the installed CLI 2.1.183 with a scratch-marketplace probe: a one-plugin marketplace using the flat `source: "./skills/probe"` + `skills: ["./"]` layout installed via `plugin install ... --scope local` with **no** `Path escapes plugin directory` error, so the prior nested-layout workaround (introduced for #57570) is no longer needed
+  - Flattened all 14 direct-skill plugins from the workaround's nested `skills/<name>/skills/<name>/` back to `skills/<name>/` (via `git mv` — byte-identical content), restored `skills: ["./"]` to the 14 direct-skill entries in `marketplace.json`, and repointed the 14 `.claude/skills/<name>` dev/test symlinks to `../../skills/<name>`
+  - Followed the bundle-copy **source** path from `skills/<name>/skills/<name>/` to `skills/<name>/` across `verify-bundle-sync`, `dev-workflow-triage` (+ `references/triage-criteria.md`), `triage-review`, `skill-review`, `.claude/rules/project.rules.md`, `.claude/rules/project.rules.local.md`, and `.claude/rules-extras/project.rules.examples.md`; flipped the sibling-symmetry rule from "`skills: ["./"]` omission" to "presence"; and removed the now-obsolete `project.staging.local.md` candidate that flagged the run-tests-flat-vs-nested drift this revert resolves
+  - The bump is **layout-only — no bundle-skill behavior changed**. Versions move because `git mv` renders as a changed bundle `SKILL.md` to rules-review's path-scoped diff (`git diff <base> -- <file>` breaks rename pairing → new-file add), which trips the diff-level version-bump rule; a patch bump is the honest "internal restructure" signal. The #53948 bundle-copy real-directory mechanism (`verify-bundle-sync`) is **unchanged** — only the path it copies from flattened
+  - canonical `skills/<name>/` and the `dev-workflow-bundle` copies synced byte-identical (0 drift across all 6 members)
+
 ### prose-polish v1.4.0 / dev-workflow-bundle v1.87.0
 
 - feat(prose-polish): detect cross-file duplicate comments in file mode and surface them as advisory `recommendations` instead of polishing each copy
