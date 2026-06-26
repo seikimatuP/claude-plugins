@@ -9,6 +9,7 @@
       "name": "ask-claude",
       "description": "Get a second opinion from another Claude instance",
       "source": "./skills/ask-claude",
+      "skills": ["./"],
       "version": "1.1.3",
       "author": {
         "name": "hiropon"
@@ -19,6 +20,7 @@
       "name": "ask-codex",
       "description": "Get a second opinion from OpenAI Codex",
       "source": "./skills/ask-codex",
+      "skills": ["./"],
       "version": "1.2.1",
       "author": {
         "name": "hiropon"
@@ -29,6 +31,7 @@
       "name": "ask-gemini",
       "description": "Get a second opinion from Google Gemini",
       "source": "./skills/ask-gemini",
+      "skills": ["./"],
       "version": "1.2.1",
       "author": {
         "name": "hiropon"
@@ -39,6 +42,7 @@
       "name": "ask-copilot",
       "description": "Get a second opinion from GitHub Copilot",
       "source": "./skills/ask-copilot",
+      "skills": ["./"],
       "version": "1.0.3",
       "author": {
         "name": "hiropon"
@@ -49,6 +53,7 @@
       "name": "ask-agy",
       "description": "Get a second opinion from Google Antigravity",
       "source": "./skills/ask-agy",
+      "skills": ["./"],
       "version": "1.0.0",
       "author": {
         "name": "hiropon"
@@ -59,6 +64,7 @@
       "name": "security-scanner",
       "description": "Scan plugins and skills for security risks (multi-agent support)",
       "source": "./skills/security-scanner",
+      "skills": ["./"],
       "version": "1.2.2",
       "author": {
         "name": "hiropon"
@@ -69,7 +75,8 @@
       "name": "extract-rules",
       "description": "Extract project-specific coding rules from codebase for AI agents",
       "source": "./skills/extract-rules",
-      "version": "1.21.1",
+      "skills": ["./"],
+      "version": "1.21.2",
       "author": {
         "name": "hiropon"
       },
@@ -79,6 +86,7 @@
       "name": "merge-rules",
       "description": "Merge portable coding rules from multiple projects into a unified rule set",
       "source": "./skills/merge-rules",
+      "skills": ["./"],
       "version": "2.0.1",
       "author": {
         "name": "hiropon"
@@ -99,7 +107,8 @@
       "name": "peer",
       "description": "Peer engineer for code review, planning, and brainstorming",
       "source": "./skills/ask-peer",
-      "version": "2.4.3",
+      "skills": ["./"],
+      "version": "2.4.4",
       "author": {
         "name": "hiropon"
       },
@@ -119,7 +128,8 @@
       "name": "dev-workflow",
       "description": "Guided development workflow: planning, review, implementation, testing, and rule maintenance",
       "source": "./skills/dev-workflow",
-      "version": "1.79.0",
+      "skills": ["./"],
+      "version": "1.79.1",
       "author": {
         "name": "hiropon"
       },
@@ -130,7 +140,7 @@
       "description": "Development workflow bundle (includes peer + extract-rules + dev-workflow + rules-review + tidy + prose-polish)",
       "source": "./plugins/dev-workflow-bundle",
       "skills": ["./skills/ask-peer", "./skills/dev-workflow", "./skills/extract-rules", "./skills/rules-review", "./skills/tidy", "./skills/prose-polish"],
-      "version": "1.87.0",
+      "version": "1.87.1",
       "author": {
         "name": "hiropon"
       },
@@ -140,6 +150,7 @@
       "name": "apply-rules",
       "description": "Apply organization-wide rules to projects (filter by tech stack, merge with existing rules)",
       "source": "./skills/apply-rules",
+      "skills": ["./"],
       "version": "2.0.2",
       "author": {
         "name": "hiropon"
@@ -150,7 +161,8 @@
       "name": "rules-review",
       "description": "Check code changes for .claude/rules/ compliance using parallel sub-agent review",
       "source": "./skills/rules-review",
-      "version": "1.4.3",
+      "skills": ["./"],
+      "version": "1.4.4",
       "author": {
         "name": "hiropon"
       },
@@ -160,7 +172,8 @@
       "name": "tidy",
       "description": "Review changed code for reuse, quality, and efficiency, then apply cleanup edits.",
       "source": "./skills/tidy",
-      "version": "1.4.0",
+      "skills": ["./"],
+      "version": "1.4.1",
       "author": {
         "name": "hiropon"
       },
@@ -170,7 +183,8 @@
       "name": "prose-polish",
       "description": "Refactor verbose or unnatural prose into concise, native-sounding text in a configured target language using a sonnet subagent (file mode rewrites in place, text mode returns the result)",
       "source": "./skills/prose-polish",
-      "version": "1.4.0",
+      "skills": ["./"],
+      "version": "1.4.1",
       "author": {
         "name": "hiropon"
       },
