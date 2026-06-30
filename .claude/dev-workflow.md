@@ -13,7 +13,7 @@ hooks:
     - "Skill(publicity-review)"
     - "Skill(work-complete)"
 self_retrospective:
-  feedback: "SonicGarden/dev-workflow-issues"
+  feedback: "seikimatuP/claude-plugins"
 compact_rules: true
 visual_plan_review: true
 workability_retrospective:
